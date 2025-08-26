@@ -1,0 +1,7 @@
+ext/*
+img/*
+*.o
+*.d
+setup.sh
+*.ppm
+*.hdr
