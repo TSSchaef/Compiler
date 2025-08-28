@@ -1,6 +1,6 @@
 #Makefile
-BINARY=compiler
-DEV-BINARY=compiler-dev
+BINARY=mycc
+DEV-BINARY=mycc-dev
 CODEDIRS=src
 INCDIRS=src ext 
 
