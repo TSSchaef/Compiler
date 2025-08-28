@@ -1,11 +1,17 @@
 #include "logging.h"
+#include "scanner.h"
 
 int main(int argc, char *argv[]){
     switch(handleInputs(argv, argc)){
         case 1:
             logCompilerInfo();
             break;
+
         case 2:
+            //TO DO: handle filepath
+            scan(argv[0]);
+            break;
+
         case 3:
         case 4:
         case 5:
