@@ -1,5 +1,5 @@
 #include "logging.h"
-#include "scanner.h"
+#include "lexer.h"
 
 int main(int argc, char *argv[]){
     switch(handleInputs(argv, argc)){
@@ -8,10 +8,8 @@ int main(int argc, char *argv[]){
             break;
 
         case 2:
-            //TO DO: handle filepath
-            scan(argv[0]);
+            lexer(argv[2]);
             break;
-
         case 3:
         case 4:
         case 5:

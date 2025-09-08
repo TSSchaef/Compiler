@@ -1,11 +1,12 @@
 #include "logging.h"
+#include <stdio.h>
 
 void logUsage(){
     fprintf(stderr, "\n\n Usage: \n mycc -mode infile \n \nmode: integer 1-5 \ninfile: path to file to compile (Not used for mode 1)\n");
 }
 
 void logCompilerInfo(){
-    fprintf(stderr, "My very own C compiler written for COM S 4400, Fall 2025. \n Written by Tyler Schaefer (tschaef@iastate.edu) \n Version 0.0.1-SNAPSHOT, released 28 August, 2025\n");
+    fprintf(stderr, "My very own C compiler written for COM S 4400, Fall 2025. \n Written by Tyler Schaefer (tschaef@iastate.edu) \n Version 0.0.1-SNAPSHOT, released 12 September, 2025\n");
 }
 
 void logNotSupported(){
@@ -36,9 +37,6 @@ int handleInputs(char *argv[], int argc){
             return -1;
         }
     }
-
-    //TO DO: Get input file 
-    fprintf(stderr, "Infiles not yet supported. \n");
 
     return mode;
 }

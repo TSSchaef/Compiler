@@ -1,10 +1,11 @@
+/*
+* This is a demo hello world program but
+* there is no #include directives as it is
+* optional
+*
+*/
 
-int main(int argc, char *argv[]){
-
-    int x = 0;
-    if (x == 0){
-        x = x + 5;
-    }
-
-    return 0;
+int main()
+{
+return printf("Hello, world!\n");
 }
