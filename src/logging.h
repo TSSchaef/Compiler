@@ -10,4 +10,6 @@ void logCompilerInfo();
 void logNotSupported();
 void logImproperInput();
 
+void logBadInput(char *functionName){
+
 #endif

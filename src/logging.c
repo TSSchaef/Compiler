@@ -18,6 +18,10 @@ void logImproperInput(){
     logUsage();
 }
 
+void logBadInput(char *functionName){
+    fprintf(stderr, "Bad input to function %s\n", functionName);
+}
+
 int handleInputs(char *argv[], int argc){
     //No flags/arguments
     int mode;
