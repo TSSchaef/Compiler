@@ -5,11 +5,13 @@ CODEDIRS=src
 INCDIRS=src ext 
 
 CC=gcc
+LEX=flex
+
 #use DEV options for development
 #PROD for production
 DEV-OPT=-O0
 PROD-OPT=-O3
-LIBFLAGS=
+LIBFLAGS= -lfl
 #-lm -lpthread
 DEPFLAGS=-MP -MD
 DEV-CFLAGS=-Wall -Werror -g $(foreach D, $(INCDIRS), -I$(D)) $(DEV-OPT) $(DEPFLAGS)
@@ -17,6 +19,10 @@ PROD-CFLAGS=$(foreach D, $(INCDIRS), -I$(D)) $(PROD-OPT) $(DEPFLAGS)
 
 CFILES=	$(foreach D,$(CODEDIRS), $(wildcard $(D)/*.c))
 OBJECTS= $(patsubst %.c, %.o, $(CFILES)) 
+
+LEXFILES= $(foreach D,$(CODEDIRS), $(wildcard $(D)/*.l))
+LEX_OUTPUT = $(CODEDIRS)/lex.yy.c
+
 DEV-OBJECTS= $(patsubst %.c, %.dev.o, $(CFILES)) 
 DEPFILES= $(patsubst %.c, %.d, $(CFILES)) 
 DEV-DEPFILES= $(patsubst %.c, %.dev.d, $(CFILES)) 
@@ -24,8 +30,11 @@ DEV-DEPFILES= $(patsubst %.c, %.dev.d, $(CFILES))
 # Default used for production
 all: $(BINARY)
 
-$(BINARY): $(OBJECTS)
+$(BINARY): $(LEX_OUTPUT) $(OBJECTS) 
 	$(CC) -o $@ $^ $(LIBFLAGS)
+
+$(LEX_OUTPUT): $(LEXFILES)
+	$(LEX) -o $@ $<
 
 %.o: %.c
 	$(CC) $(PROD-CFLAGS) -c -o $@ $<
@@ -47,7 +56,7 @@ $(DEV-BINARY): $(DEV-OBJECTS)
 .PHONY: clean
 
 clean:
-	@rm -f $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) perf.data*
+	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) perf.data*
 
 diff:
 	$(info The status of the repository, and the volume of per-file changes:)

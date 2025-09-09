@@ -42,6 +42,7 @@ int handleInputs(char *argv[], int argc){
         }
     }
 
+
     return mode;
 }
 
