@@ -21,7 +21,7 @@ CFILES=	$(foreach D,$(CODEDIRS), $(wildcard $(D)/*.c))
 OBJECTS= $(patsubst %.c, %.o, $(CFILES)) 
 
 LEXFILES= $(foreach D,$(CODEDIRS), $(wildcard $(D)/*.l))
-LEX_OUTPUT = $(CODEDIRS)/lex.yy.c
+LEX_OUTPUT = $(CODEDIRS)/lex.yy.o
 
 DEV-OBJECTS= $(patsubst %.c, %.dev.o, $(CFILES)) 
 DEPFILES= $(patsubst %.c, %.d, $(CFILES)) 
@@ -34,7 +34,8 @@ $(BINARY): $(LEX_OUTPUT) $(OBJECTS)
 	$(CC) -o $@ $^ $(LIBFLAGS)
 
 $(LEX_OUTPUT): $(LEXFILES)
-	$(LEX) -o $@ $<
+	$(LEX) -o $(CODEDIRS)/lex.yy.c $<
+	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/lex.yy.c
 
 %.o: %.c
 	$(CC) $(PROD-CFLAGS) -c -o $@ $<
