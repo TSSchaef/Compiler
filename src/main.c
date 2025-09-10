@@ -4,9 +4,9 @@
 #include "logging.h"
 
 // For lex
-extern FILE *yyin;
-extern char *filename;
+int pushFile(const char *filename);
 int yylex(void);
+
 
 int main(int argc, char *argv[]){
     switch(handleInputs(argv, argc)){
@@ -15,14 +15,9 @@ int main(int argc, char *argv[]){
             break;
 
         case 2:
-            FILE *file = fopen(argv[2], "r");
-            if(file == NULL){
-                fprintf(stderr, "Could not open file %s\n", argv[2]);
-                return -1;
+            if(pushFile(argv[2]) != 0){
+               return -1;
             }
-
-            filename = argv[2];
-            yyin = file;
 
             yylex();
 

@@ -1,0 +1,145 @@
+Found include filename: test/test1/test1-1.h
+File test1-1.h Line 3 Token 301 Text int
+File test1-1.h Line 3 Token 306 Text main
+File test1-1.h Line 3 Token 40 Text (
+File test1-1.h Line 3 Token 41 Text )
+File test1-1.h Line 3 Token 123 Text {
+File test1-1.h Line 4 Token 301 Text char
+File test1-1.h Line 4 Token 42 Text *
+File test1-1.h Line 4 Token 306 Text str
+File test1-1.h Line 4 Token 61 Text =
+File test1-1.h Line 4 Token 305 Text "Hit file 2!!"
+File test1-1.h Line 4 Token 59 Text ;
+File test1-1.h Line 6 Token 410 Text return
+File test1-1.h Line 6 Token 45 Text -
+File test1-1.h Line 6 Token 303 Text 1
+File test1-1.h Line 6 Token 59 Text ;
+File test1-1.h Line 7 Token 125 Text }
+File test1.c Line 7 Token 301 Text int
+File test1.c Line 7 Token 306 Text main
+File test1.c Line 7 Token 40 Text (
+File test1.c Line 7 Token 41 Text )
+File test1.c Line 7 Token 123 Text {
+File test1.c Line 8 Token 301 Text char
+File test1.c Line 8 Token 42 Text *
+File test1.c Line 8 Token 306 Text str
+File test1.c Line 8 Token 61 Text =
+File test1.c Line 8 Token 305 Text "HELLO \\ WORLD!!"
+File test1.c Line 8 Token 59 Text ;
+File test1.c Line 9 Token 301 Text char
+File test1.c Line 9 Token 42 Text *
+File test1.c Line 9 Token 306 Text str2
+File test1.c Line 9 Token 61 Text =
+File test1.c Line 9 Token 305 Text "\"HELLO WORLD!!\""
+File test1.c Line 9 Token 59 Text ;
+File test1.c Line 10 Token 301 Text char
+File test1.c Line 10 Token 42 Text *
+File test1.c Line 10 Token 306 Text str3
+File test1.c Line 10 Token 61 Text =
+File test1.c Line 10 Token 305 Text "HELLO WORLD!!\n"
+File test1.c Line 10 Token 59 Text ;
+File test1.c Line 12 Token 301 Text int
+File test1.c Line 12 Token 306 Text a
+File test1.c Line 12 Token 61 Text =
+File test1.c Line 12 Token 303 Text 0
+File test1.c Line 12 Token 306 Text x1A3F
+File test1.c Line 12 Token 59 Text ;
+File test1.c Line 13 Token 301 Text int
+File test1.c Line 13 Token 306 Text b
+File test1.c Line 13 Token 61 Text =
+File test1.c Line 13 Token 303 Text 0
+File test1.c Line 13 Token 306 Text X4d2
+File test1.c Line 13 Token 59 Text ;
+File test1.c Line 14 Token 301 Text int
+File test1.c Line 14 Token 306 Text c
+File test1.c Line 14 Token 61 Text =
+File test1.c Line 14 Token 303 Text 0
+File test1.c Line 14 Token 306 Text x0
+File test1.c Line 14 Token 59 Text ;
+File test1.c Line 15 Token 301 Text int
+File test1.c Line 15 Token 306 Text d
+File test1.c Line 15 Token 61 Text =
+File test1.c Line 15 Token 303 Text 0
+File test1.c Line 15 Token 306 Text X7FFFF
+File test1.c Line 15 Token 59 Text ;
+File test1.c Line 16 Token 301 Text int
+File test1.c Line 16 Token 306 Text e
+File test1.c Line 16 Token 61 Text =
+File test1.c Line 16 Token 303 Text 0
+File test1.c Line 16 Token 306 Text x10AB42
+File test1.c Line 16 Token 59 Text ;
+File test1.c Line 18 Token 301 Text float
+File test1.c Line 18 Token 306 Text stuff
+File test1.c Line 18 Token 61 Text =
+File test1.c Line 18 Token 304 Text 31.41592
+File test1.c Line 18 Token 59 Text ;
+File test1.c Line 19 Token 301 Text float
+File test1.c Line 19 Token 306 Text myStuffelseif
+File test1.c Line 19 Token 61 Text =
+File test1.c Line 19 Token 304 Text 6.022
+File test1.c Line 19 Token 306 Text e23
+File test1.c Line 19 Token 59 Text ;
+File test1.c Line 20 Token 301 Text float
+File test1.c Line 20 Token 306 Text returnStuff
+File test1.c Line 20 Token 61 Text =
+File test1.c Line 20 Token 304 Text 1.1231231
+File test1.c Line 20 Token 306 Text e
+File test1.c Line 20 Token 45 Text -
+File test1.c Line 20 Token 303 Text 23
+File test1.c Line 20 Token 59 Text ;
+File test1.c Line 21 Token 301 Text float
+File test1.c Line 21 Token 306 Text floatNum
+File test1.c Line 21 Token 61 Text =
+File test1.c Line 21 Token 303 Text 1
+File test1.c Line 21 Token 306 Text e
+File test1.c Line 21 Token 43 Text +
+File test1.c Line 21 Token 303 Text 1000
+File test1.c Line 21 Token 59 Text ;
+File test1.c Line 23 Token 301 Text char
+File test1.c Line 23 Token 306 Text c1
+File test1.c Line 23 Token 61 Text =
+Lexer error in file test1.c line 23 at text '
+Unrecognized character
+File test1.c Line 23 Token 306 Text a
+Lexer error in file test1.c line 23 at text '
+Unrecognized character
+File test1.c Line 23 Token 59 Text ;
+File test1.c Line 24 Token 301 Text char
+File test1.c Line 24 Token 306 Text c2
+File test1.c Line 24 Token 61 Text =
+Lexer error in file test1.c line 24 at text '
+Unrecognized character
+Lexer error in file test1.c line 24 at text \
+Unrecognized character
+File test1.c Line 24 Token 306 Text n
+Lexer error in file test1.c line 24 at text '
+Unrecognized character
+File test1.c Line 24 Token 59 Text ;
+File test1.c Line 25 Token 301 Text char
+File test1.c Line 25 Token 306 Text c3
+File test1.c Line 25 Token 61 Text =
+Lexer error in file test1.c line 25 at text '
+Unrecognized character
+Lexer error in file test1.c line 25 at text \
+Unrecognized character
+Lexer error in file test1.c line 25 at text \
+Unrecognized character
+Lexer error in file test1.c line 25 at text '
+Unrecognized character
+File test1.c Line 25 Token 59 Text ;
+File test1.c Line 26 Token 301 Text char
+File test1.c Line 26 Token 306 Text c4
+File test1.c Line 26 Token 61 Text =
+Lexer error in file test1.c line 26 at text '
+Unrecognized character
+Lexer error in file test1.c line 26 at text \
+Unrecognized character
+Lexer error in file test1.c line 26 at text '
+Unrecognized character
+Lexer error in file test1.c line 26 at text '
+Unrecognized character
+File test1.c Line 26 Token 59 Text ;
+File test1.c Line 28 Token 410 Text return
+File test1.c Line 28 Token 303 Text 0
+File test1.c Line 28 Token 59 Text ;
+File test1.c Line 29 Token 125 Text }
