@@ -2,6 +2,7 @@ ext/*
 img/*
 *.o
 *.d
+*.log
 setup.sh
 *.ppm
 *.hdr
