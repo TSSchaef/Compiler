@@ -1,0 +1,35 @@
+0a1
+> Found include filename: test/test1/test1-1.h
+73,74c74
+< File test1.c Line 19 Token 304 Text 6.022
+< File test1.c Line 19 Token 306 Text e23
+---
+> File test1.c Line 19 Token 304 Text 6.022e23
+79,82c79
+< File test1.c Line 20 Token 304 Text 1.1231231
+< File test1.c Line 20 Token 306 Text e
+< File test1.c Line 20 Token 45 Text -
+< File test1.c Line 20 Token 303 Text 23
+---
+> File test1.c Line 20 Token 304 Text 1.1231231e-23
+87,90c84
+< File test1.c Line 21 Token 303 Text 1
+< File test1.c Line 21 Token 306 Text e
+< File test1.c Line 21 Token 43 Text +
+< File test1.c Line 21 Token 303 Text 1000
+---
+> File test1.c Line 21 Token 303 Text 1e+1000
+100c94
+< File test1.c Line 24 Token 302 Text '
+'
+---
+> File test1.c Line 23 Token 302 Text '
+'
+105c99
+< File test1.c Line 25 Token 302 Text '\'
+---
+> File test1.c Line 23 Token 302 Text '\'
+110c104
+< File test1.c Line 26 Token 302 Text '\''
+---
+> File test1.c Line 23 Token 302 Text '\''

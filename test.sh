@@ -19,4 +19,12 @@ else
     echo "$TEST1_DIFF" > test/log/test1_diff.log
 fi
 
-
+./mycc -2 test/test2/test2.c > test/test2/test_out.txt
+TEST2_DIFF=$(diff test/test2/test_out.txt test/test2/test2.txt)
+if [ -z "$TEST2_DIFF" ]; then
+    echo "Test 2 passed!"
+    rm -f test/log/test2_diff.log
+else
+    echo "Test 2 FAILED!"
+    echo "$TEST2_DIFF" > test/log/test2_diff.log
+fi

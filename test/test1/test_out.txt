@@ -1,4 +1,3 @@
-Found include filename: test/test1/test1-1.h
 File test1-1.h Line 3 Token 301 Text int
 File test1-1.h Line 3 Token 306 Text main
 File test1-1.h Line 3 Token 40 Text (
@@ -41,32 +40,27 @@ File test1.c Line 10 Token 59 Text ;
 File test1.c Line 12 Token 301 Text int
 File test1.c Line 12 Token 306 Text a
 File test1.c Line 12 Token 61 Text =
-File test1.c Line 12 Token 303 Text 0
-File test1.c Line 12 Token 306 Text x1A3F
+File test1.c Line 12 Token 307 Text 6719
 File test1.c Line 12 Token 59 Text ;
 File test1.c Line 13 Token 301 Text int
 File test1.c Line 13 Token 306 Text b
 File test1.c Line 13 Token 61 Text =
-File test1.c Line 13 Token 303 Text 0
-File test1.c Line 13 Token 306 Text X4d2
+File test1.c Line 13 Token 307 Text 1234
 File test1.c Line 13 Token 59 Text ;
 File test1.c Line 14 Token 301 Text int
 File test1.c Line 14 Token 306 Text c
 File test1.c Line 14 Token 61 Text =
-File test1.c Line 14 Token 303 Text 0
-File test1.c Line 14 Token 306 Text x0
+File test1.c Line 14 Token 307 Text 0
 File test1.c Line 14 Token 59 Text ;
 File test1.c Line 15 Token 301 Text int
 File test1.c Line 15 Token 306 Text d
 File test1.c Line 15 Token 61 Text =
-File test1.c Line 15 Token 303 Text 0
-File test1.c Line 15 Token 306 Text X7FFFF
+File test1.c Line 15 Token 307 Text 524287
 File test1.c Line 15 Token 59 Text ;
 File test1.c Line 16 Token 301 Text int
 File test1.c Line 16 Token 306 Text e
 File test1.c Line 16 Token 61 Text =
-File test1.c Line 16 Token 303 Text 0
-File test1.c Line 16 Token 306 Text x10AB42
+File test1.c Line 16 Token 307 Text 1092418
 File test1.c Line 16 Token 59 Text ;
 File test1.c Line 18 Token 301 Text float
 File test1.c Line 18 Token 306 Text stuff
@@ -98,46 +92,22 @@ File test1.c Line 21 Token 59 Text ;
 File test1.c Line 23 Token 301 Text char
 File test1.c Line 23 Token 306 Text c1
 File test1.c Line 23 Token 61 Text =
-Lexer error in file test1.c line 23 at text '
-Unrecognized character
-File test1.c Line 23 Token 306 Text a
-Lexer error in file test1.c line 23 at text '
-Unrecognized character
+File test1.c Line 23 Token 302 Text 'a'
 File test1.c Line 23 Token 59 Text ;
 File test1.c Line 24 Token 301 Text char
 File test1.c Line 24 Token 306 Text c2
 File test1.c Line 24 Token 61 Text =
-Lexer error in file test1.c line 24 at text '
-Unrecognized character
-Lexer error in file test1.c line 24 at text \
-Unrecognized character
-File test1.c Line 24 Token 306 Text n
-Lexer error in file test1.c line 24 at text '
-Unrecognized character
+File test1.c Line 24 Token 302 Text '\n'
 File test1.c Line 24 Token 59 Text ;
 File test1.c Line 25 Token 301 Text char
 File test1.c Line 25 Token 306 Text c3
 File test1.c Line 25 Token 61 Text =
-Lexer error in file test1.c line 25 at text '
-Unrecognized character
-Lexer error in file test1.c line 25 at text \
-Unrecognized character
-Lexer error in file test1.c line 25 at text \
-Unrecognized character
-Lexer error in file test1.c line 25 at text '
-Unrecognized character
+File test1.c Line 25 Token 302 Text '\\'
 File test1.c Line 25 Token 59 Text ;
 File test1.c Line 26 Token 301 Text char
 File test1.c Line 26 Token 306 Text c4
 File test1.c Line 26 Token 61 Text =
-Lexer error in file test1.c line 26 at text '
-Unrecognized character
-Lexer error in file test1.c line 26 at text \
-Unrecognized character
-Lexer error in file test1.c line 26 at text '
-Unrecognized character
-Lexer error in file test1.c line 26 at text '
-Unrecognized character
+File test1.c Line 26 Token 302 Text '\''
 File test1.c Line 26 Token 59 Text ;
 File test1.c Line 28 Token 410 Text return
 File test1.c Line 28 Token 303 Text 0

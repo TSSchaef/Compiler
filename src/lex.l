@@ -20,15 +20,21 @@
     FileStack fileStack[STACK_SIZE];
     int fileStackTop = 0;
 
+    void printError(const char *msg){
+        fprintf(stderr, "Lexer error in file %s line %d at text %s\n%s\n",
+            fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
+    }
+
     int pushFile(const char *filename) {
         if (fileStackTop >= STACK_SIZE) {
-            fprintf(stderr, "File stack overflow\n");
+            printError("File stack overflow\n");
             return -1;
         }
 
         FILE *file = fopen(filename, "r");
         if (!file) {
-            fprintf(stderr, "Could not open file %s\n", filename);
+            // TODO : write erroor message with standard forat ^^
+            // fprintf(stderr, "Could not open file %s\n", filename);
             return -1;
         }
 
@@ -70,6 +76,7 @@
         char *start = strchr(yytext, '"');
         char filename[FILE_SIZE]; 
 
+        // TODO: handle relative paths
         if (start) {
             start++; // Move past the first quote
             const char *end = strchr(start, '"');
@@ -77,7 +84,8 @@
                 int len = end - start;
                 strncpy(filename, start, len);
                 filename[len] = '\0';
-                printf("Found include filename: %s\n", filename);
+                // TODO: Standardize message
+                // printf("Found include filename: %s\n", filename);
             }
         }
         
@@ -85,17 +93,23 @@
             printf("Failed to include file %s\n", filename);
         } 
     }
+    
+    void printHex(int token){
+        unsigned int i = 0;
+        if(sscanf(yytext, "%x", &i) != 1){
+            printError("Invalid hex number");
+            return;
+        }
 
+        printf("File %s Line %d Token %d Text %d\n", 
+            fileStack[fileStackTop - 1].filename, yylineno, token, i);
+    }
 
     void printToken(int token){
         printf("File %s Line %d Token %d Text %s\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, yytext);
     }
 
-    void printError(const char *msg){
-        printf("Lexer error in file %s line %d at text %s\n%s\n",
-            fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
-    }
 
 %}
 
@@ -140,21 +154,23 @@ bool                        { printToken(416); }
 #[ \t]*include[ \t]*\"[^\"]+\"  { getFile(); }
 
 int|float|char|void         { printToken(301); }
-'\''(\\[ntrb\\'\"]|[^\\'])'\''   { printToken(302); }    
+\'(\\[ntrb\\'\"]|[^\\'])\'  { printToken(302); }    
 [0-9]+                      { printToken(303); }
 [0-9]*\.[0-9]+              { printToken(304); }
 \".*\"                      { printToken(305); }
 [a-zA-Z_][a-zA-Z0-9_]*      { printToken(306); }
+0[xX][0-9abcdefABCDEF]+     { printHex(307); }
 
-"//".*[\n|$(?!.)]             { }
 
-"/*"  { BEGIN COMMENT; }
-<COMMENT>[^*/]+ { /* ignore anything that is not '*' or '/' */ }
-<COMMENT>("*"+)"/" { BEGIN INITIAL; }
-<COMMENT>[*/] { /* residual stuff */ }
 
-[\n]                        { }
-[ \t\r\v\f]+                { /* Ignore whitespace */ }
+"//".*[\n|$(?!.)]           { /* Ignore single line comments */}
+
+"/*"                        { BEGIN COMMENT; }
+<COMMENT>[^*/]+             { /* ignore anything that is not '*' or '/' */ }
+<COMMENT>("*"+)"/"          { BEGIN INITIAL; }
+<COMMENT>[*/]               { /* residual stuff */ }
+
+[ \n\t\r\v\f]+              { /* Ignore whitespace */ }
 .                           { printError("Unrecognized character"); }
 %%
 
