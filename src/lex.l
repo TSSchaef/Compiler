@@ -7,12 +7,15 @@
 
     #define STACK_SIZE 256
     #define FILE_SIZE 256
+    #define MAX_FILE_NAME_SIZE 256
 
 
     typedef struct {
         char *filename;
         char *filepath;
         FILE *file;
+        char outputFileName[MAX_FILE_NAME_SIZE];
+        FILE *outputFile;
         YY_BUFFER_STATE buffer;
         int lineNumber;
     } FileStack;
@@ -25,6 +28,18 @@
             fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
     }
 
+    void getOutputFileName(const char *inputFile, char *outputFile) {
+        const char *dot = strrchr(inputFile, '.');
+        if (dot) {
+            size_t len = dot - inputFile;
+            strncpy(outputFile, inputFile, len);
+            outputFile[len] = '\0';
+            strcat(outputFile, ".lexer");
+        } else {
+            snprintf(outputFile, MAX_FILE_NAME_SIZE, "%s.lexer", inputFile);
+        }
+    }
+
     int pushFile(const char *filename) {
         if (fileStackTop >= STACK_SIZE) {
             printError("File stack overflow\n");
@@ -33,7 +48,7 @@
 
         FILE *file = fopen(filename, "r");
         if (!file) {
-            // TODO : write erroor message with standard forat ^^
+            // TODO : write error message with standard format ^^
             // fprintf(stderr, "Could not open file %s\n", filename);
             return -1;
         }
@@ -41,7 +56,22 @@
         fileStack[fileStackTop].filepath = strdup(filename);
         //basename to get the file name without path
         fileStack[fileStackTop].filename = basename(fileStack[fileStackTop].filepath);
+
+
+
+        getOutputFileName(fileStack[fileStackTop].filename,
+                            fileStack[fileStackTop].outputFileName);
+
+        //FILE *output = stdout;
+        FILE *output = fopen(fileStack[fileStackTop].outputFileName, "w");
+        if(!output) {
+            // TODO : write error message with standard format ^^
+            // fprintf(stderr, "Could not open output file %s\n", fileStack[fileStackTop].outputFileName);
+            return -1;
+        }
+
         fileStack[fileStackTop].file = file;
+        fileStack[fileStackTop].outputFile = output;
         fileStack[fileStackTop].lineNumber = yylineno;
         fileStack[fileStackTop].buffer = yy_create_buffer(file, YY_BUF_SIZE);
         yy_switch_to_buffer(fileStack[fileStackTop].buffer);
@@ -57,6 +87,7 @@
 
         fileStackTop--;
         fclose(fileStack[fileStackTop].file);
+        fclose(fileStack[fileStackTop].outputFile);
         free(fileStack[fileStackTop].filepath);
 
         yy_delete_buffer(fileStack[fileStackTop].buffer);
@@ -101,12 +132,14 @@
             return;
         }
 
-        printf("File %s Line %d Token %d Text %d\n", 
+        fprintf(fileStack[fileStackTop - 1].outputFile, 
+            "File %s Line %d Token %d Text %d\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, i);
     }
 
     void printToken(int token){
-        printf("File %s Line %d Token %d Text %s\n", 
+        fprintf(fileStack[fileStackTop - 1].outputFile, 
+            "File %s Line %d Token %d Text %s\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, yytext);
     }
 

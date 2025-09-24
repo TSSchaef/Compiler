@@ -594,12 +594,15 @@ char *yytext;
 
     #define STACK_SIZE 256
     #define FILE_SIZE 256
+    #define MAX_FILE_NAME_SIZE 256
 
 
     typedef struct {
         char *filename;
         char *filepath;
         FILE *file;
+        char outputFileName[MAX_FILE_NAME_SIZE];
+        FILE *outputFile;
         YY_BUFFER_STATE buffer;
         int lineNumber;
     } FileStack;
@@ -612,6 +615,18 @@ char *yytext;
             fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
     }
 
+    void getOutputFileName(const char *inputFile, char *outputFile) {
+        const char *dot = strrchr(inputFile, '.');
+        if (dot) {
+            size_t len = dot - inputFile;
+            strncpy(outputFile, inputFile, len);
+            outputFile[len] = '\0';
+            strcat(outputFile, ".lexer");
+        } else {
+            snprintf(outputFile, MAX_FILE_NAME_SIZE, "%s.lexer", inputFile);
+        }
+    }
+
     int pushFile(const char *filename) {
         if (fileStackTop >= STACK_SIZE) {
             printError("File stack overflow\n");
@@ -620,7 +635,7 @@ char *yytext;
 
         FILE *file = fopen(filename, "r");
         if (!file) {
-            // TODO : write erroor message with standard forat ^^
+            // TODO : write error message with standard format ^^
             // fprintf(stderr, "Could not open file %s\n", filename);
             return -1;
         }
@@ -628,7 +643,22 @@ char *yytext;
         fileStack[fileStackTop].filepath = strdup(filename);
         //basename to get the file name without path
         fileStack[fileStackTop].filename = basename(fileStack[fileStackTop].filepath);
+
+
+
+        getOutputFileName(fileStack[fileStackTop].filename,
+                            fileStack[fileStackTop].outputFileName);
+
+        //FILE *output = stdout;
+        FILE *output = fopen(fileStack[fileStackTop].outputFileName, "w");
+        if(!output) {
+            // TODO : write error message with standard format ^^
+            // fprintf(stderr, "Could not open output file %s\n", fileStack[fileStackTop].outputFileName);
+            return -1;
+        }
+
         fileStack[fileStackTop].file = file;
+        fileStack[fileStackTop].outputFile = output;
         fileStack[fileStackTop].lineNumber = yylineno;
         fileStack[fileStackTop].buffer = yy_create_buffer(file, YY_BUF_SIZE);
         yy_switch_to_buffer(fileStack[fileStackTop].buffer);
@@ -644,6 +674,7 @@ char *yytext;
 
         fileStackTop--;
         fclose(fileStack[fileStackTop].file);
+        fclose(fileStack[fileStackTop].outputFile);
         free(fileStack[fileStackTop].filepath);
 
         yy_delete_buffer(fileStack[fileStackTop].buffer);
@@ -688,19 +719,21 @@ char *yytext;
             return;
         }
 
-        printf("File %s Line %d Token %d Text %d\n", 
+        fprintf(fileStack[fileStackTop - 1].outputFile, 
+            "File %s Line %d Token %d Text %d\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, i);
     }
 
     void printToken(int token){
-        printf("File %s Line %d Token %d Text %s\n", 
+        fprintf(fileStack[fileStackTop - 1].outputFile, 
+            "File %s Line %d Token %d Text %s\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, yytext);
     }
 
 
-#line 702 "src/lex.yy.c"
+#line 735 "src/lex.yy.c"
 
-#line 704 "src/lex.yy.c"
+#line 737 "src/lex.yy.c"
 
 #define INITIAL 0
 #define COMMENT 1
@@ -916,9 +949,9 @@ YY_DECL
 		}
 
 	{
-#line 118 "src/lex.l"
+#line 151 "src/lex.l"
 
-#line 922 "src/lex.yy.c"
+#line 955 "src/lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -987,245 +1020,245 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 119 "src/lex.l"
+#line 152 "src/lex.l"
 { printToken(yytext[0]); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 121 "src/lex.l"
+#line 154 "src/lex.l"
 { printToken(351);} 
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 122 "src/lex.l"
+#line 155 "src/lex.l"
 { printToken(352);} 
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 123 "src/lex.l"
+#line 156 "src/lex.l"
 { printToken(353);} 
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 124 "src/lex.l"
+#line 157 "src/lex.l"
 { printToken(354);} 
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 125 "src/lex.l"
+#line 158 "src/lex.l"
 { printToken(355);} 
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 126 "src/lex.l"
+#line 159 "src/lex.l"
 { printToken(356);} 
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 127 "src/lex.l"
+#line 160 "src/lex.l"
 { printToken(357);} 
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 128 "src/lex.l"
+#line 161 "src/lex.l"
 { printToken(358);} 
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 130 "src/lex.l"
+#line 163 "src/lex.l"
 { printToken(361);} 
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 131 "src/lex.l"
+#line 164 "src/lex.l"
 { printToken(362);} 
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 132 "src/lex.l"
+#line 165 "src/lex.l"
 { printToken(363);} 
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 133 "src/lex.l"
+#line 166 "src/lex.l"
 { printToken(364);} 
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 134 "src/lex.l"
+#line 167 "src/lex.l"
 { printToken(365);} 
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 135 "src/lex.l"
+#line 168 "src/lex.l"
 { printToken(366);} 
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 137 "src/lex.l"
+#line 170 "src/lex.l"
 { printToken(401); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 138 "src/lex.l"
+#line 171 "src/lex.l"
 { printToken(402); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 139 "src/lex.l"
+#line 172 "src/lex.l"
 { printToken(403); }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 140 "src/lex.l"
+#line 173 "src/lex.l"
 { printToken(404); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 141 "src/lex.l"
+#line 174 "src/lex.l"
 { printToken(405); }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 142 "src/lex.l"
+#line 175 "src/lex.l"
 { printToken(406); }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 143 "src/lex.l"
+#line 176 "src/lex.l"
 { printToken(407); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 144 "src/lex.l"
+#line 177 "src/lex.l"
 { printToken(408); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 145 "src/lex.l"
+#line 178 "src/lex.l"
 { printToken(409); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 146 "src/lex.l"
+#line 179 "src/lex.l"
 { printToken(410); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 147 "src/lex.l"
+#line 180 "src/lex.l"
 { printToken(411); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 148 "src/lex.l"
+#line 181 "src/lex.l"
 { printToken(412); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 149 "src/lex.l"
+#line 182 "src/lex.l"
 { printToken(413); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 150 "src/lex.l"
+#line 183 "src/lex.l"
 { printToken(414); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 151 "src/lex.l"
+#line 184 "src/lex.l"
 { printToken(415); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 152 "src/lex.l"
+#line 185 "src/lex.l"
 { printToken(416); }
 	YY_BREAK
 case 32:
 /* rule 32 can match eol */
 YY_RULE_SETUP
-#line 154 "src/lex.l"
+#line 187 "src/lex.l"
 { getFile(); }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 156 "src/lex.l"
+#line 189 "src/lex.l"
 { printToken(301); }
 	YY_BREAK
 case 34:
 /* rule 34 can match eol */
 YY_RULE_SETUP
-#line 157 "src/lex.l"
+#line 190 "src/lex.l"
 { printToken(302); }    
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 158 "src/lex.l"
+#line 191 "src/lex.l"
 { printToken(303); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 159 "src/lex.l"
+#line 192 "src/lex.l"
 { printToken(304); }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 160 "src/lex.l"
+#line 193 "src/lex.l"
 { printToken(305); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 161 "src/lex.l"
+#line 194 "src/lex.l"
 { printToken(306); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 162 "src/lex.l"
+#line 195 "src/lex.l"
 { printHex(307); }
 	YY_BREAK
 case 40:
 /* rule 40 can match eol */
 YY_RULE_SETUP
-#line 166 "src/lex.l"
+#line 199 "src/lex.l"
 { /* Ignore single line comments */}
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 168 "src/lex.l"
+#line 201 "src/lex.l"
 { BEGIN COMMENT; }
 	YY_BREAK
 case 42:
 /* rule 42 can match eol */
 YY_RULE_SETUP
-#line 169 "src/lex.l"
+#line 202 "src/lex.l"
 { /* ignore anything that is not '*' or '/' */ }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 170 "src/lex.l"
+#line 203 "src/lex.l"
 { BEGIN INITIAL; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 171 "src/lex.l"
+#line 204 "src/lex.l"
 { /* residual stuff */ }
 	YY_BREAK
 case 45:
 /* rule 45 can match eol */
 YY_RULE_SETUP
-#line 173 "src/lex.l"
+#line 206 "src/lex.l"
 { /* Ignore whitespace */ }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 174 "src/lex.l"
+#line 207 "src/lex.l"
 { printError("Unrecognized character"); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 175 "src/lex.l"
+#line 208 "src/lex.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1229 "src/lex.yy.c"
+#line 1262 "src/lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(COMMENT):
 	yyterminate();
@@ -2202,7 +2235,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 175 "src/lex.l"
+#line 208 "src/lex.l"
 
 
 // Additional C code section

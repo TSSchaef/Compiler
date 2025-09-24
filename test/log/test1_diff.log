@@ -19,17 +19,3 @@
 < File test1.c Line 21 Token 303 Text 1000
 ---
 > File test1.c Line 21 Token 303 Text 1e+1000
-100c94
-< File test1.c Line 24 Token 302 Text '
-'
----
-> File test1.c Line 23 Token 302 Text '
-'
-105c99
-< File test1.c Line 25 Token 302 Text '\'
----
-> File test1.c Line 23 Token 302 Text '\'
-110c104
-< File test1.c Line 26 Token 302 Text '\''
----
-> File test1.c Line 23 Token 302 Text '\''
