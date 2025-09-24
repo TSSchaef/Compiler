@@ -1,6 +1,0 @@
-File test2-1.h Line 3 Token 305 Text "File #1"
-File test2-5.h Line 3 Token 305 Text "File #5"
-File test2-4.h Line 4 Token 305 Text "File #4"
-File test2-3.h Line 4 Token 305 Text "File #3"
-File test2-2.h Line 4 Token 305 Text "File #2"
-File test2.c Line 3 Token 305 Text "Main file"

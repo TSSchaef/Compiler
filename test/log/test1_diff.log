@@ -1,21 +1,112 @@
-0a1
+0a1,109
 > Found include filename: test/test1/test1-1.h
-73,74c74
-< File test1.c Line 19 Token 304 Text 6.022
-< File test1.c Line 19 Token 306 Text e23
----
+> File test1-1.h Line 3 Token 301 Text int
+> File test1-1.h Line 3 Token 306 Text main
+> File test1-1.h Line 3 Token 40 Text (
+> File test1-1.h Line 3 Token 41 Text )
+> File test1-1.h Line 3 Token 123 Text {
+> File test1-1.h Line 4 Token 301 Text char
+> File test1-1.h Line 4 Token 42 Text *
+> File test1-1.h Line 4 Token 306 Text str
+> File test1-1.h Line 4 Token 61 Text =
+> File test1-1.h Line 4 Token 305 Text "Hit file 2!!"
+> File test1-1.h Line 4 Token 59 Text ;
+> File test1-1.h Line 6 Token 410 Text return
+> File test1-1.h Line 6 Token 45 Text -
+> File test1-1.h Line 6 Token 303 Text 1
+> File test1-1.h Line 6 Token 59 Text ;
+> File test1-1.h Line 7 Token 125 Text }
+> File test1.c Line 7 Token 301 Text int
+> File test1.c Line 7 Token 306 Text main
+> File test1.c Line 7 Token 40 Text (
+> File test1.c Line 7 Token 41 Text )
+> File test1.c Line 7 Token 123 Text {
+> File test1.c Line 8 Token 301 Text char
+> File test1.c Line 8 Token 42 Text *
+> File test1.c Line 8 Token 306 Text str
+> File test1.c Line 8 Token 61 Text =
+> File test1.c Line 8 Token 305 Text "HELLO \ WORLD!!"
+> File test1.c Line 8 Token 59 Text ;
+> File test1.c Line 9 Token 301 Text char
+> File test1.c Line 9 Token 42 Text *
+> File test1.c Line 9 Token 306 Text str2
+> File test1.c Line 9 Token 61 Text =
+> File test1.c Line 9 Token 305 Text "\"HELLO WORLD!!\""
+> File test1.c Line 9 Token 59 Text ;
+> File test1.c Line 10 Token 301 Text char
+> File test1.c Line 10 Token 42 Text *
+> File test1.c Line 10 Token 306 Text str3
+> File test1.c Line 10 Token 61 Text =
+> File test1.c Line 10 Token 305 Text "HELLO WORLD!!
+"
+> File test1.c Line 10 Token 59 Text ;
+> File test1.c Line 12 Token 301 Text int
+> File test1.c Line 12 Token 306 Text a
+> File test1.c Line 12 Token 61 Text =
+> File test1.c Line 12 Token 307 Text 6719
+> File test1.c Line 12 Token 59 Text ;
+> File test1.c Line 13 Token 301 Text int
+> File test1.c Line 13 Token 306 Text b
+> File test1.c Line 13 Token 61 Text =
+> File test1.c Line 13 Token 307 Text 1234
+> File test1.c Line 13 Token 59 Text ;
+> File test1.c Line 14 Token 301 Text int
+> File test1.c Line 14 Token 306 Text c
+> File test1.c Line 14 Token 61 Text =
+> File test1.c Line 14 Token 307 Text 0
+> File test1.c Line 14 Token 59 Text ;
+> File test1.c Line 15 Token 301 Text int
+> File test1.c Line 15 Token 306 Text d
+> File test1.c Line 15 Token 61 Text =
+> File test1.c Line 15 Token 307 Text 524287
+> File test1.c Line 15 Token 59 Text ;
+> File test1.c Line 16 Token 301 Text int
+> File test1.c Line 16 Token 306 Text e
+> File test1.c Line 16 Token 61 Text =
+> File test1.c Line 16 Token 307 Text 1092418
+> File test1.c Line 16 Token 59 Text ;
+> File test1.c Line 18 Token 301 Text float
+> File test1.c Line 18 Token 306 Text stuff
+> File test1.c Line 18 Token 61 Text =
+> File test1.c Line 18 Token 304 Text 31.41592
+> File test1.c Line 18 Token 59 Text ;
+> File test1.c Line 19 Token 301 Text float
+> File test1.c Line 19 Token 306 Text myStuffelseif
+> File test1.c Line 19 Token 61 Text =
 > File test1.c Line 19 Token 304 Text 6.022e23
-79,82c79
-< File test1.c Line 20 Token 304 Text 1.1231231
-< File test1.c Line 20 Token 306 Text e
-< File test1.c Line 20 Token 45 Text -
-< File test1.c Line 20 Token 303 Text 23
----
+> File test1.c Line 19 Token 59 Text ;
+> File test1.c Line 20 Token 301 Text float
+> File test1.c Line 20 Token 306 Text returnStuff
+> File test1.c Line 20 Token 61 Text =
 > File test1.c Line 20 Token 304 Text 1.1231231e-23
-87,90c84
-< File test1.c Line 21 Token 303 Text 1
-< File test1.c Line 21 Token 306 Text e
-< File test1.c Line 21 Token 43 Text +
-< File test1.c Line 21 Token 303 Text 1000
----
+> File test1.c Line 20 Token 59 Text ;
+> File test1.c Line 21 Token 301 Text float
+> File test1.c Line 21 Token 306 Text floatNum
+> File test1.c Line 21 Token 61 Text =
 > File test1.c Line 21 Token 303 Text 1e+1000
+> File test1.c Line 21 Token 59 Text ;
+> File test1.c Line 23 Token 301 Text char
+> File test1.c Line 23 Token 306 Text c1
+> File test1.c Line 23 Token 61 Text =
+> File test1.c Line 23 Token 302 Text 'a'
+> File test1.c Line 23 Token 59 Text ;
+> File test1.c Line 24 Token 301 Text char
+> File test1.c Line 24 Token 306 Text c2
+> File test1.c Line 24 Token 61 Text =
+> File test1.c Line 24 Token 302 Text '
+'
+> File test1.c Line 24 Token 59 Text ;
+> File test1.c Line 25 Token 301 Text char
+> File test1.c Line 25 Token 306 Text c3
+> File test1.c Line 25 Token 61 Text =
+> File test1.c Line 25 Token 302 Text '\'
+> File test1.c Line 25 Token 59 Text ;
+> File test1.c Line 26 Token 301 Text char
+> File test1.c Line 26 Token 306 Text c4
+> File test1.c Line 26 Token 61 Text =
+> File test1.c Line 26 Token 302 Text '\''
+> File test1.c Line 26 Token 59 Text ;
+> File test1.c Line 28 Token 410 Text return
+> File test1.c Line 28 Token 303 Text 0
+> File test1.c Line 28 Token 59 Text ;
+> File test1.c Line 29 Token 125 Text }

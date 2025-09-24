@@ -10,12 +10,13 @@
     #define MAX_FILE_NAME_SIZE 256
 
 
+    char outputFileName[MAX_FILE_NAME_SIZE];
+    FILE *outputFile;
+
     typedef struct {
         char *filename;
         char *filepath;
         FILE *file;
-        char outputFileName[MAX_FILE_NAME_SIZE];
-        FILE *outputFile;
         YY_BUFFER_STATE buffer;
         int lineNumber;
     } FileStack;
@@ -59,20 +60,26 @@
 
 
 
-        getOutputFileName(fileStack[fileStackTop].filename,
-                            fileStack[fileStackTop].outputFileName);
+        // If first file (all output to one file)
+        if(fileStackTop == 0) {
+            getOutputFileName(fileStack[fileStackTop].filename, outputFileName);
 
-        //FILE *output = stdout;
-        FILE *output = fopen(fileStack[fileStackTop].outputFileName, "w");
-        if(!output) {
-            // TODO : write error message with standard format ^^
-            // fprintf(stderr, "Could not open output file %s\n", fileStack[fileStackTop].outputFileName);
-            return -1;
+            //FILE *output = stdout;
+            outputFile = fopen(outputFileName, "w");
+            if(!outputFile) {
+                // TODO : write error message with standard format ^^
+                // fprintf(stderr, "Could not open output file %s\n", fileStack[fileStackTop].outputFileName);
+                return -1;
+            }
         }
 
+
+
         fileStack[fileStackTop].file = file;
-        fileStack[fileStackTop].outputFile = output;
-        fileStack[fileStackTop].lineNumber = yylineno;
+        if(fileStackTop > 0) {
+            fileStack[fileStackTop - 1].lineNumber = yylineno;
+            yylineno = 1;
+        }
         fileStack[fileStackTop].buffer = yy_create_buffer(file, YY_BUF_SIZE);
         yy_switch_to_buffer(fileStack[fileStackTop].buffer);
 
@@ -87,7 +94,6 @@
 
         fileStackTop--;
         fclose(fileStack[fileStackTop].file);
-        fclose(fileStack[fileStackTop].outputFile);
         free(fileStack[fileStackTop].filepath);
 
         yy_delete_buffer(fileStack[fileStackTop].buffer);
@@ -132,14 +138,12 @@
             return;
         }
 
-        fprintf(fileStack[fileStackTop - 1].outputFile, 
-            "File %s Line %d Token %d Text %d\n", 
+        fprintf(outputFile, "File %s Line %d Token %d Text %d\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, i);
     }
 
     void printToken(int token){
-        fprintf(fileStack[fileStackTop - 1].outputFile, 
-            "File %s Line %d Token %d Text %s\n", 
+        fprintf(outputFile, "File %s Line %d Token %d Text %s\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, yytext);
     }
 
@@ -187,7 +191,7 @@ bool                        { printToken(416); }
 #[ \t]*include[ \t]*\"[^\"]+\"  { getFile(); }
 
 int|float|char|void         { printToken(301); }
-\'(\\[ntrb\\'\"]|[^\\'])\'  { printToken(302); }    
+\'(\\[antrb\\'\"]|[^\\'])\' { printToken(302); }    
 [0-9]+                      { printToken(303); }
 [0-9]*\.[0-9]+              { printToken(304); }
 \".*\"                      { printToken(305); }
@@ -211,10 +215,12 @@ int|float|char|void         { printToken(301); }
 
 int yywrap() {
     if (popFile() != 0) {
+        fclose(outputFile);
         return 1; // No more files to process
     }
 
     if (!yyin) {
+        fclose(outputFile);
         return 1; // No more files to process
     }     
 
