@@ -14,6 +14,9 @@ int main() {
     int c = 0x0;
     int d = 0X7FFFF;
     int e = 0x10AB42;
+
+    --
+    $
     
     float stuff = 31.41592;
     float myStuffelseif = 6.022e23;

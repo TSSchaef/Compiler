@@ -5,10 +5,14 @@
     #include <stdio.h>
     #include <libgen.h>
 
-    #define STACK_SIZE 256
+    #define STACK_SIZE 512 
     #define FILE_SIZE 256
     #define MAX_FILE_NAME_SIZE 256
 
+    #define MAX_INT_LEN     48
+    #define MAX_REAL_LEN    48
+    #define MAX_IDENT_LEN   48
+    #define MAX_STRING_LEN  1024 
 
     char outputFileName[MAX_FILE_NAME_SIZE];
     FILE *outputFile;
@@ -24,9 +28,11 @@
     FileStack fileStack[STACK_SIZE];
     int fileStackTop = 0;
 
-    void printError(const char *msg){
-        fprintf(stderr, "Lexer error in file %s line %d at text %s\n%s\n",
+    void error(const char *msg){
+        fprintf(stderr, "Lexer error in file %s line %d at text %s\n\t%s\n",
             fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
+        remove(outputFileName);
+        exit(1);
     }
 
     void getOutputFileName(const char *inputFile, char *outputFile) {
@@ -43,7 +49,7 @@
 
     int pushFile(const char *filename) {
         if (fileStackTop >= STACK_SIZE) {
-            printError("File stack overflow\n");
+            error("File stack overflow\n");
             return -1;
         }
 
@@ -134,7 +140,7 @@
     void printHex(int token){
         unsigned int i = 0;
         if(sscanf(yytext, "%x", &i) != 1){
-            printError("Invalid hex number");
+            error("Invalid hex number");
             return;
         }
 
@@ -192,12 +198,45 @@ bool                        { printToken(416); }
 
 int|float|char|void         { printToken(301); }
 \'(\\[antrb\\'\"]|[^\\'])\' { printToken(302); }    
-[0-9]+                      { printToken(303); }
-[0-9]*\.[0-9]+              { printToken(304); }
-\".*\"                      { printToken(305); }
-[a-zA-Z_][a-zA-Z0-9_]*      { printToken(306); }
-0[xX][0-9abcdefABCDEF]+     { printHex(307); }
+\'(\\[antrb\\'\"]|[^\\'])[^']+ { error("Unclosed character literal"); }
 
+[0-9]+                      { if(yyleng > MAX_INT_LEN) {
+                                error("Integer literal excedes max length");
+                                return 0;
+                            }
+                            printToken(303); 
+                            }
+
+[0-9]*\.[0-9]+(e[+\-]?[0-9]+)?  {  if(yyleng > MAX_REAL_LEN) {
+                                    error("Real number excedes max length");
+                                    return 0;
+                                }
+                                printToken(304);
+                                }
+
+[0-9]*e[+\-]?[0-9]+         {  if(yyleng > MAX_REAL_LEN) {
+                                    error("Real number excedes max length");
+                                    return 0;
+                                }
+                                printToken(304);
+                            }
+
+\".*\"                      {  if(yyleng > MAX_STRING_LEN) {
+                                    error("String length excedes max length");
+                                    return 0;
+                                }
+                                printToken(305);
+                            }
+
+[a-zA-Z_][a-zA-Z0-9_]*      {  if(yyleng > MAX_IDENT_LEN) {
+                                    error("Identifier length excedes max length");
+                                    return 0;
+                                }
+                                printToken(306);
+                            }
+
+0[xX][0-9abcdefABCDEF]+     { printHex(307); }
+\^=?                        { printToken(308); }
 
 
 "//".*[\n|$(?!.)]           { /* Ignore single line comments */}
@@ -208,7 +247,7 @@ int|float|char|void         { printToken(301); }
 <COMMENT>[*/]               { /* residual stuff */ }
 
 [ \n\t\r\v\f]+              { /* Ignore whitespace */ }
-.                           { printError("Unrecognized character"); }
+.                           { error("Unrecognized character"); }
 %%
 
 // Additional C code section
