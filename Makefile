@@ -57,7 +57,7 @@ $(DEV-BINARY): $(DEV-OBJECTS)
 .PHONY: clean
 
 clean:
-	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) perf.data* *.lexer
+	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) $(CODEDIRS)/lex.yy.c perf.data* *.lexer
 
 diff:
 	$(info The status of the repository, and the volume of per-file changes:)
