@@ -7,7 +7,6 @@
 int pushFile(const char *filename);
 int yylex(void);
 
-
 int main(int argc, char *argv[]){
     switch(handleInputs(argv, argc)){
         case 1:
@@ -20,8 +19,8 @@ int main(int argc, char *argv[]){
             }
 
             yylex();
-
             break;
+
         case 3:
         case 4:
         case 5:

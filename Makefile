@@ -6,6 +6,7 @@ INCDIRS=src ext
 
 CC=gcc
 LEX=flex
+PARSE=bison
 
 #use DEV options for development
 #PROD for production
@@ -23,6 +24,9 @@ OBJECTS= $(patsubst %.c, %.o, $(CFILES))
 LEXFILES= $(foreach D,$(CODEDIRS), $(wildcard $(D)/*.l))
 LEX_OUTPUT = $(CODEDIRS)/lex.yy.o
 
+PARSEFILES= $(foreach D,$(CODEDIRS), $(wildcard $(D)/*.y))
+PARSE_OUTPUT = $(CODEDIRS)/parse.tab.o
+
 DEV-OBJECTS= $(patsubst %.c, %.dev.o, $(CFILES)) 
 DEPFILES= $(patsubst %.c, %.d, $(CFILES)) 
 DEV-DEPFILES= $(patsubst %.c, %.dev.d, $(CFILES)) 
@@ -30,12 +34,16 @@ DEV-DEPFILES= $(patsubst %.c, %.dev.d, $(CFILES))
 # Default used for production
 all: $(BINARY)
 
-$(BINARY): $(LEX_OUTPUT) $(OBJECTS) 
+$(BINARY): $(LEX_OUTPUT) $(PARSE_OUTPUT) $(OBJECTS) 
 	$(CC) -o $@ $^ $(LIBFLAGS)
 
 $(LEX_OUTPUT): $(LEXFILES)
 	$(LEX) -o $(CODEDIRS)/lex.yy.c $<
 	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/lex.yy.c
+
+$(PARSE_OUTPUT): $(PARSEFILES)
+	$(PARSE) -o $(CODEDIRS)/parse.tab.c $<
+	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/parse.tab.c
 
 %.o: %.c
 	$(CC) $(PROD-CFLAGS) -c -o $@ $<
@@ -57,7 +65,7 @@ $(DEV-BINARY): $(DEV-OBJECTS)
 .PHONY: clean
 
 clean:
-	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) $(CODEDIRS)/lex.yy.c perf.data* *.lexer
+	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) $(CODEDIRS)/lex.yy.c perf.data* *.lexer $(CODEDIRS)/parse.tab.c *.parser
 
 diff:
 	$(info The status of the repository, and the volume of per-file changes:)
