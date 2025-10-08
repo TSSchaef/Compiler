@@ -2,9 +2,9 @@
 #include <stdlib.h>
 
 #include "logging.h"
+#include "stack.h"
 
 // For lex
-int pushFile(const char *filename);
 int yylex(void);
 
 int main(int argc, char *argv[]){
