@@ -8,9 +8,10 @@
 int yylex(void);
 int yyparse(void);
 
+int mode;
 
 int main(int argc, char *argv[]){
-    switch(handleInputs(argv, argc)){
+    switch(mode = handleInputs(argv, argc)){
         case 1:
             logCompilerInfo();
             break;

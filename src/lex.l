@@ -5,6 +5,8 @@
     #include <stdio.h>
     #include <libgen.h>
 
+    #include "global.h"
+
     #define STACK_SIZE 512 
     #define FILE_SIZE 256
     #define MAX_FILE_NAME_SIZE 256
@@ -144,11 +146,21 @@
             return;
         }
 
+        if(mode != 2){
+            // Only to .lexer file in mode 2 (lexer mode)
+            return;
+        }
+
         fprintf(outputFile, "File %s Line %d Token %d Text %d\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, i);
     }
 
     void printToken(int token){
+        if(mode != 2){
+            // Only to .lexer file in mode 2 (lexer mode)
+            return;
+        }
+
         fprintf(outputFile, "File %s Line %d Token %d Text %s\n", 
             fileStack[fileStackTop - 1].filename, yylineno, token, yytext);
     }
