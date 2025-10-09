@@ -4,8 +4,10 @@
 #include "logging.h"
 #include "stack.h"
 
-// For lex
+// For lex and bison
 int yylex(void);
+int yyparse(void);
+
 
 int main(int argc, char *argv[]){
     switch(handleInputs(argv, argc)){
@@ -18,10 +20,17 @@ int main(int argc, char *argv[]){
                return -1;
             }
 
-            yylex();
+            while( yylex() != 0);
             break;
 
         case 3:
+            if(pushFile(argv[2]) != 0){
+               return -1;
+            }
+
+            yyparse();
+            break;
+
         case 4:
         case 5:
             logNotSupported();

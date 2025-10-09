@@ -159,45 +159,45 @@
 %x COMMENT
 
 %%
-[\!%&()\*\+,\-\./:;<=>\?[\]{\|}~]  { printToken(yytext[0]); }
+[\!%&()\*\+,\-\./:;<=>\?[\]{\|}~]  { printToken(yytext[0]); return yytext[0]; }
 
-==                          { printToken(351);} 
-!=                          { printToken(352);} 
->=                          { printToken(353);} 
-"<"=                        { printToken(354);} 
-\+\+                        { printToken(355);} 
---                          { printToken(356);} 
-\|\|                        { printToken(357);} 
-&&                          { printToken(358);} 
+==                          { printToken(351); return 351; }
+!=                          { printToken(352); return 352; }
+>=                          { printToken(353); return 353; }
+"<"=                        { printToken(354); return 354; }
+\+\+                        { printToken(355); return 355; }
+--                          { printToken(356); return 356; }
+\|\|                        { printToken(357); return 357; }
+&&                          { printToken(358); return 358; }
 
-\+=                         { printToken(361);} 
--=                          { printToken(362);} 
-\*=                         { printToken(363);} 
-\/=                         { printToken(364);} 
-->                          { printToken(365);} 
-%=                          { printToken(366);} 
+\+=                         { printToken(361); return 361; }
+-=                          { printToken(362); return 362; }
+\*=                         { printToken(363); return 363; }
+\/=                         { printToken(364); return 364; }
+->                          { printToken(365); return 365; }
+%=                          { printToken(366); return 366;} 
 
-const                       { printToken(401); }
-struct                      { printToken(402); }
-for                         { printToken(403); }
-while                       { printToken(404); }
-do                          { printToken(405); }
-if                          { printToken(406); }
-else                        { printToken(407); }
-break                       { printToken(408); }
-continue                    { printToken(409); }
-return                      { printToken(410); }
-switch                      { printToken(411); }
-case                        { printToken(412); }
-default                     { printToken(413); }
-true                        { printToken(414); }
-false                       { printToken(415); }
-bool                        { printToken(416); }
+const                       { printToken(401); return 401; }
+struct                      { printToken(402); return 402; }
+for                         { printToken(403); return 403; }
+while                       { printToken(404); return 404; }
+do                          { printToken(405); return 405; }
+if                          { printToken(406); return 406; }
+else                        { printToken(407); return 407; }
+break                       { printToken(408); return 408; }
+continue                    { printToken(409); return 409; }
+return                      { printToken(410); return 410; }
+switch                      { printToken(411); return 411; }
+case                        { printToken(412); return 412; }
+default                     { printToken(413); return 413; }
+true                        { printToken(414); return 414; }
+false                       { printToken(415); return 415; }
+bool                        { printToken(416); return 416; }
 
 #[ \t]*include[ \t]*\"[^\"]+\"  { getFile(); }
 
-int|float|char|void         { printToken(301); }
-\'(\\[antrb\\'\"]|[^\\'])\' { printToken(302); }    
+int|float|char|void         { printToken(301); return 301; }
+\'(\\[antrb\\'\"]|[^\\'])\' { printToken(302); return 302; }
 \'(\\[antrb\\'\"]|[^\\'])[^']+ { error("Unclosed character literal"); }
 
 [0-9]+                      { if(yyleng > MAX_INT_LEN) {
@@ -205,6 +205,7 @@ int|float|char|void         { printToken(301); }
                                 return 0;
                             }
                             printToken(303); 
+                            return 303;
                             }
 
 [0-9]*\.[0-9]+(e[+\-]?[0-9]+)?  {  if(yyleng > MAX_REAL_LEN) {
@@ -212,6 +213,7 @@ int|float|char|void         { printToken(301); }
                                     return 0;
                                 }
                                 printToken(304);
+                                return 304;
                                 }
 
 [0-9]*e[+\-]?[0-9]+         {  if(yyleng > MAX_REAL_LEN) {
@@ -219,6 +221,7 @@ int|float|char|void         { printToken(301); }
                                     return 0;
                                 }
                                 printToken(304);
+                                return 304;
                             }
 
 \".*\"                      {  if(yyleng > MAX_STRING_LEN) {
@@ -226,6 +229,7 @@ int|float|char|void         { printToken(301); }
                                     return 0;
                                 }
                                 printToken(305);
+                                return 305;
                             }
 
 [a-zA-Z_][a-zA-Z0-9_]*      {  if(yyleng > MAX_IDENT_LEN) {
@@ -233,10 +237,11 @@ int|float|char|void         { printToken(301); }
                                     return 0;
                                 }
                                 printToken(306);
+                                return 306;
                             }
 
-0[xX][0-9abcdefABCDEF]+     { printHex(307); }
-\^=?                        { printToken(308); }
+0[xX][0-9abcdefABCDEF]+     { printHex(307); return 307; }
+\^=?                        { printToken(308); return 308; }
 
 
 "//".*[\n|$(?!.)]           { /* Ignore single line comments */}
