@@ -34,15 +34,16 @@ DEV-DEPFILES= $(patsubst %.c, %.dev.d, $(CFILES))
 # Default used for production
 all: $(BINARY)
 
-$(BINARY): $(LEX_OUTPUT) $(PARSE_OUTPUT) $(OBJECTS) 
+$(BINARY): $(PARSE_OUTPUT) $(LEX_OUTPUT) $(OBJECTS) 
 	$(CC) -o $@ $^ $(LIBFLAGS)
 
 $(LEX_OUTPUT): $(LEXFILES)
 	$(LEX) -o $(CODEDIRS)/lex.yy.c $<
 	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/lex.yy.c
 
+# -d generates the header file
 $(PARSE_OUTPUT): $(PARSEFILES)
-	$(PARSE) -o $(CODEDIRS)/parse.tab.c $<
+	$(PARSE) -d -o $(CODEDIRS)/parse.tab.c $<
 	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/parse.tab.c
 
 %.o: %.c
@@ -65,7 +66,7 @@ $(DEV-BINARY): $(DEV-OBJECTS)
 .PHONY: clean
 
 clean:
-	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) $(CODEDIRS)/lex.yy.c perf.data* *.lexer $(CODEDIRS)/parse.tab.c *.parser
+	@rm -f $(LEX_OUTPUT) $(OBJECTS) $(DEPFILES) $(BINARY) $(DEV-OBJECTS) $(DEV-DEPFILES) $(DEV-BINARY) $(CODEDIRS)/lex.yy.c perf.data* *.lexer $(CODEDIRS)/parse.tab.* *.parser
 
 diff:
 	$(info The status of the repository, and the volume of per-file changes:)

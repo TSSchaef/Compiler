@@ -5,7 +5,11 @@
     #include <stdio.h>
     #include <libgen.h>
 
+    // For token definitions, so they're only in one place
+    #include "parse.tab.h"
+
     #include "global.h"
+
 
     #define STACK_SIZE 512 
     #define FILE_SIZE 256
@@ -173,87 +177,87 @@
 %%
 [\!%&()\*\+,\-\./:;<=>\?[\]{\|}~]  { printToken(yytext[0]); return yytext[0]; }
 
-==                          { printToken(351); return 351; }
-!=                          { printToken(352); return 352; }
->=                          { printToken(353); return 353; }
-"<"=                        { printToken(354); return 354; }
-\+\+                        { printToken(355); return 355; }
---                          { printToken(356); return 356; }
-\|\|                        { printToken(357); return 357; }
-&&                          { printToken(358); return 358; }
+==                          { printToken(EQUALITY); return EQUALITY; }
+!=                          { printToken(NOT_EQUAL); return NOT_EQUAL; }
+>=                          { printToken(GT_EQUAL); return GT_EQUAL; }
+"<"=                        { printToken(LT_EQUAL); return LT_EQUAL; }
+\+\+                        { printToken(PLUS_PLUS); return PLUS_PLUS; }
+--                          { printToken(MINUS_MINUS); return MINUS_MINUS; }
+\|\|                        { printToken(OR_OR); return OR_OR; }
+&&                          { printToken(AND_AND); return AND_AND; }
 
-\+=                         { printToken(361); return 361; }
--=                          { printToken(362); return 362; }
-\*=                         { printToken(363); return 363; }
-\/=                         { printToken(364); return 364; }
-->                          { printToken(365); return 365; }
-%=                          { printToken(366); return 366;} 
+\+=                         { printToken(PLUS_EQUAL); return PLUS_EQUAL; }
+-=                          { printToken(MINUS_EQUAL); return MINUS_EQUAL; }
+\*=                         { printToken(TIMES_EQUAL); return TIMES_EQUAL; }
+\/=                         { printToken(DIVIDE_EQUAL); return DIVIDE_EQUAL; }
+->                          { printToken(ARROW); return ARROW; }
+%=                          { printToken(MODULO_EQUAL); return MODULO_EQUAL;} 
 
-const                       { printToken(401); return 401; }
-struct                      { printToken(402); return 402; }
-for                         { printToken(403); return 403; }
-while                       { printToken(404); return 404; }
-do                          { printToken(405); return 405; }
-if                          { printToken(406); return 406; }
-else                        { printToken(407); return 407; }
-break                       { printToken(408); return 408; }
-continue                    { printToken(409); return 409; }
-return                      { printToken(410); return 410; }
-switch                      { printToken(411); return 411; }
-case                        { printToken(412); return 412; }
-default                     { printToken(413); return 413; }
-true                        { printToken(414); return 414; }
-false                       { printToken(415); return 415; }
-bool                        { printToken(416); return 416; }
+const                       { printToken(CONST); return CONST; }
+struct                      { printToken(STRUCT); return STRUCT; }
+for                         { printToken(FOR); return FOR; }
+while                       { printToken(WHILE); return WHILE; }
+do                          { printToken(DO); return DO; }
+if                          { printToken(IF); return IF; }
+else                        { printToken(ELSE); return ELSE; }
+break                       { printToken(BREAK); return BREAK; }
+continue                    { printToken(CONTINUE); return CONTINUE; }
+return                      { printToken(RETURN); return RETURN; }
+switch                      { printToken(SWITCH); return SWITCH; }
+case                        { printToken(CASE); return CASE; }
+default                     { printToken(DEFAULT); return DEFAULT; }
+true                        { printToken(TRUE); return TRUE; }
+false                       { printToken(FALSE); return FALSE; }
+bool                        { printToken(BOOL); return BOOL; }
 
 #[ \t]*include[ \t]*\"[^\"]+\"  { getFile(); }
 
-int|float|char|void         { printToken(301); return 301; }
-\'(\\[antrb\\'\"]|[^\\'])\' { printToken(302); return 302; }
+int|float|char|void         { printToken(TYPE); return TYPE; }
+\'(\\[antrb\\'\"]|[^\\'])\' { printToken(CHAR); return CHAR; }
 \'(\\[antrb\\'\"]|[^\\'])[^']+ { error("Unclosed character literal"); }
 
 [0-9]+                      { if(yyleng > MAX_INT_LEN) {
                                 error("Integer literal excedes max length");
                                 return 0;
                             }
-                            printToken(303); 
-                            return 303;
+                            printToken(INT); 
+                            return INT;
                             }
 
 [0-9]*\.[0-9]+(e[+\-]?[0-9]+)?  {  if(yyleng > MAX_REAL_LEN) {
                                     error("Real number excedes max length");
                                     return 0;
                                 }
-                                printToken(304);
-                                return 304;
+                                printToken(FLOAT);
+                                return FLOAT;
                                 }
 
 [0-9]*e[+\-]?[0-9]+         {  if(yyleng > MAX_REAL_LEN) {
                                     error("Real number excedes max length");
                                     return 0;
                                 }
-                                printToken(304);
-                                return 304;
+                                printToken(FLOAT);
+                                return FLOAT;
                             }
 
 \".*\"                      {  if(yyleng > MAX_STRING_LEN) {
                                     error("String length excedes max length");
                                     return 0;
                                 }
-                                printToken(305);
-                                return 305;
+                                printToken(STRING);
+                                return STRING;
                             }
 
 [a-zA-Z_][a-zA-Z0-9_]*      {  if(yyleng > MAX_IDENT_LEN) {
                                     error("Identifier length excedes max length");
                                     return 0;
                                 }
-                                printToken(306);
-                                return 306;
+                                printToken(IDENT);
+                                return IDENT;
                             }
 
-0[xX][0-9abcdefABCDEF]+     { printHex(307); return 307; }
-\^=?                        { printToken(308); return 308; }
+0[xX][0-9abcdefABCDEF]+     { printHex(HEX); return HEX; }
+\^=?                        { printToken(BITWISE); return BITWISE; }
 
 
 "//".*[\n|$(?!.)]           { /* Ignore single line comments */}
