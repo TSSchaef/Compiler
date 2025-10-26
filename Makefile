@@ -43,7 +43,7 @@ $(LEX_OUTPUT): $(LEXFILES)
 
 # -d generates the header file
 $(PARSE_OUTPUT): $(PARSEFILES)
-	$(PARSE) -d -o $(CODEDIRS)/parse.tab.c $<
+	$(PARSE) -d -Wcounterexamples -o $(CODEDIRS)/parse.tab.c $<
 	$(CC) $(PROD-CFLAGS) -c -o $@ $(CODEDIRS)/parse.tab.c
 
 %.o: %.c

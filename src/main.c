@@ -29,7 +29,7 @@ int main(int argc, char *argv[]){
                return -1;
             }
 
-            yyparse();
+            while(yyparse() != 0);
             break;
 
         case 4:

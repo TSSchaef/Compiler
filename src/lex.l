@@ -73,7 +73,7 @@
 
 
         // If first file (all output to one file)
-        if(fileStackTop == 0) {
+        if(fileStackTop == 0 && mode == 2) {
             getOutputFileName(fileStack[fileStackTop].filename, outputFileName);
 
             //FILE *output = stdout;
@@ -274,15 +274,14 @@ int|float|char|void         { printToken(TYPE); return TYPE; }
 // Additional C code section
 
 int yywrap() {
-    if (popFile() != 0) {
-        fclose(outputFile);
+    if (popFile() != 0 || !yyin) {
+        if(mode == 2){
+            //close output file
+            fclose(outputFile);
+        }
+
         return 1; // No more files to process
     }
-
-    if (!yyin) {
-        fclose(outputFile);
-        return 1; // No more files to process
-    }     
 
     return 0;
 }
