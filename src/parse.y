@@ -6,6 +6,10 @@
 char *yyfilename = NULL;
 
 extern int yylineno;
+extern char *yytext;
+
+//extern char *outputFileName;
+char *tempOutputFile = "outputFile.parse";
 
 int yylex(void);
 void yyerror(const char *s);
@@ -61,23 +65,76 @@ void print_parser(const char *kind, const char *ident);
 
 %%
 
-C :  Var
-  | Fun
+C :  Var C
+  | Fun_def C
+  |
   ;
 
-Var : TYPE IDENT ';' {print_parser("global variable", "ident");}
+Var : TYPE IDENT opt_array opt_ident_list ';' {print_parser("global variable", "ident");}
+    ; 
+
+opt_ident_list : 
+           | ',' IDENT opt_array opt_ident_list;
+           ;
+
+opt_array :
+          | '[' INT ']' 
+          ;
+
+Fun_dec : TYPE IDENT '(' opt_param_list ')' {print_parser("function ", "ident");}
     ;
 
-Fun : TYPE IDENT '(';
+opt_empty_array :
+          | '[' ']' 
+          ;
+
+opt_param_list :
+                | TYPE IDENT opt_empty_array opt_param_list_tail
+               ;
+
+opt_param_list_tail :
+                     | ',' TYPE IDENT opt_empty_array opt_param_list_tail
+                    ;
+
+Fun_def : Fun_dec '{' opt_fun_body '}'
+        ;
+
+opt_fun_body :
+            | Var opt_fun_body
+            | Stat opt_fun_body
+             ;
+
+Stat : ';'
+     | RETURN opt_expr ';' 
+     //| IF '(' expr ')' Stat opt_else
+     | WHILE '(' expr ')' Stat
+     | DO Stat WHILE '(' expr ')' ';'
+     | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' Stat
+     ;
+
+opt_else :
+          | ELSE Stat
+          ;
+
+opt_expr :
+          | expr
+          ;
+
+expr : IDENT
+     | INT
+     | FLOAT
+     | STRING
+     | TRUE
+     | FALSE
+     ;
 
 %%
 
 /* user C code */
-
 void print_parser(const char *kind, const char *ident) {
-    printf("File %s Line %d: %s %s\n", "file", yylineno, kind, ident);
+    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, ident);
 }
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Error: %s at %s:%d\n", s, yyfilename, yylineno);
+    fprintf(stderr, "Parser error in file %s line %d at text %s\n", s, yylineno, yytext);
 }
