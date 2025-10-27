@@ -1,6 +1,7 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
 char *yyfilename = NULL;
@@ -107,6 +108,13 @@ opt_ident_list :
            | ',' IDENT {print_ident("global variable", $2);} opt_array opt_ident_list;
            ;
 
+Var_local : TYPE IDENT {print_ident("local variable", $2);} opt_array opt_ident_local_list ';'
+    ; 
+
+opt_ident_local_list : 
+           | ',' IDENT {print_ident("local variable", $2);} opt_array opt_ident_local_list;
+           ;
+
 opt_array :
           | '[' INT ']' 
           ;
@@ -130,7 +138,7 @@ Fun_def : Fun_dec '{' opt_fun_body '}'
         ;
 
 opt_fun_body :
-             | Var opt_fun_body
+             | Var_local opt_fun_body
              | Stat opt_fun_body
              ;
 
@@ -250,7 +258,7 @@ unary_expression
     | '-' unary_expression %prec UMINUS
     | '!' unary_expression
     | '~' unary_expression
-    | '(' TYPE ')' unary_expression    /* cast: (TYPE) expr  (uses TYPE token distinct from IDENT) */
+    | '(' TYPE ')' unary_expression    // cast: (TYPE) expr  
     | postfix_expression
     ;
 
@@ -282,7 +290,7 @@ primary
 /* lvalue: exactly as specified — an identifier optionally followed by one or more bracketed expressions.
    This allows IDENT and IDENT[expr] and IDENT[expr][expr] ... */
 lvalue
-    : IDENT {print_ident("local variable", $1);}
+    : IDENT 
     | lvalue '[' expr ']' 
     ;
 
