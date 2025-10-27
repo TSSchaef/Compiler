@@ -63,6 +63,31 @@ void print_parser(const char *kind, const char *ident);
 %token BITWISE      308
 
 
+
+/* Precedence/associativity (list from lowest precedence to highest) */
+%left ','
+
+/* assignment operators are right-associative */
+%right '=' PLUS_EQUAL MINUS_EQUAL TIMES_EQUAL DIVIDE_EQUAL MODULO_EQUAL
+
+/* logical / bitwise */
+%left OR_OR
+%left AND_AND
+%left '|'
+%left '^'
+%left '&'
+
+/* equality / relational */
+%nonassoc EQUALITY NOT_EQUAL
+%nonassoc '<' '>' LT_EQUAL GT_EQUAL
+
+/* additive / multiplicative */
+%left '+' '-'
+%left '*' '/' '%'
+
+/* unary (use separate precedence name for unary minus) */
+%right UMINUS
+
 %%
 
 C :  Var C
@@ -134,72 +159,151 @@ opt_expr :
          | expr
          ;
 
-expr_list: 
+opt_expr_list: 
          | expr
-         | expr ',' expr_list_tail
+         | expr ',' expr_list
          ;
 
-expr_list_tail: expr
-              | expr ',' expr_list_tail
-              ;
-
-expr : INT
-     | FLOAT
-     | STRING
-     | TRUE
-     | FALSE
-     | IDENT '(' expr_list ')'
-     | lvalue
-     | lvalue assignment_op expr
-     | inc_dec_op lvalue
-     | lvalue inc_dec_op
-     | unary_op expr
-     | expr binary_op expr
-     | expr '?' expr ':' expr
-     | '(' TYPE ')' expr
-     | '(' expr ')'
-     ;
-
-inc_dec_op : PLUS_PLUS
-            | MINUS_MINUS
-            ;
-
-assignment_op : '='
-               | PLUS_EQUAL
-               | MINUS_EQUAL
-               | TIMES_EQUAL
-               | DIVIDE_EQUAL
-               | MODULO_EQUAL
-               ;
-unary_op : '-' 
-          | '!'
-          | '~'
-          //| BITWISE
+expr_list : expr
+          | expr ',' expr_list
           ;
 
-binary_op : '+'
-           | '-'
-           | '*'
-           | '/'
-           | '%'
-           | EQUALITY
-           | NOT_EQUAL
-           | '<'
-           | '>'
-           | LT_EQUAL
-           | GT_EQUAL
-           | AND_AND
-           | OR_OR
-           | '&'
-           | '|'
-           //| BITWISE
-           ;
+expr : assignment_expression
+     ;
 
-lvalue : IDENT
-    | IDENT '[' expr ']' 
-    //| lvalue '.' IDENT
+/* Assignment: includes all allowed assignment operators, right-associative */
+assignment_expression
+    : conditional_expression
+    | lvalue '=' assignment_expression
+    | lvalue PLUS_EQUAL assignment_expression
+    | lvalue MINUS_EQUAL assignment_expression
+    | lvalue TIMES_EQUAL assignment_expression
+    | lvalue DIVIDE_EQUAL assignment_expression
+    | lvalue MODULO_EQUAL assignment_expression
     ;
 
+/* Conditional (ternary) - right associative in the grammar by using conditional_expression on the RHS */
+conditional_expression
+    : logical_or_expression
+    | logical_or_expression '?' expr ':' conditional_expression
+    ;
+
+/* Logical / bitwise precedence chain */
+logical_or_expression
+    : logical_and_expression
+    | logical_or_expression OR_OR logical_and_expression
+    ;
+
+logical_and_expression
+    : bitwise_or_expression
+    | logical_and_expression AND_AND bitwise_or_expression
+    ;
+
+bitwise_or_expression
+    : bitwise_xor_expression
+    | bitwise_or_expression '|' bitwise_xor_expression
+    ;
+
+bitwise_xor_expression
+    : bitwise_and_expression
+    | bitwise_xor_expression '^' bitwise_and_expression
+    ;
+
+bitwise_and_expression
+    : equality_expression
+    | bitwise_and_expression '&' equality_expression
+    ;
+
+/* equality / relational */
+equality_expression
+    : relational_expression
+    | equality_expression EQUALITY relational_expression
+    | equality_expression NOT_EQUAL relational_expression
+    ;
+
+relational_expression
+    : additive_expression
+    | relational_expression '<' additive_expression
+    | relational_expression '>' additive_expression
+    | relational_expression LT_EQUAL additive_expression
+    | relational_expression GT_EQUAL additive_expression
+    ;
+
+/* additive / multiplicative */
+additive_expression
+    : multiplicative_expression
+    | additive_expression '+' multiplicative_expression
+    | additive_expression '-' multiplicative_expression
+    ;
+
+multiplicative_expression
+    : unary_expression
+    | multiplicative_expression '*' unary_expression
+    | multiplicative_expression '/' unary_expression
+    | multiplicative_expression '%' unary_expression
+    ;
+
+/* Unary expressions: prefix ++/-- on l-value handled here as pre-increment, also unary ops and casts.
+   Note: postfix ++/-- are handled via lvalue_postfix below (so we can match "lvalue inc_dec_op" and "inc_dec_op lvalue"). */
+unary_expression
+    : INCRDEC_PREFIX
+    | '&' unary_expression
+    | '*' unary_expression
+    | '+' unary_expression
+    | '-' unary_expression %prec UMINUS
+    | '!' unary_expression
+    | '~' unary_expression
+    | '(' TYPE ')' unary_expression    /* cast: (TYPE) expr  (uses TYPE token distinct from IDENT) */
+    | postfix_expression
+    ;
+
+/* helper nonterminal for prefix ++/-- form that must be followed by an lvalue */
+INCRDEC_PREFIX
+    : PLUS_PLUS lvalue
+    | MINUS_MINUS lvalue
+    ;
+
+/* postfix_expression covers primary and function-call form IDENT(expr-list) and lvalue-postfix inc/dec */
+postfix_expression
+    : primary                      /* includes function-call form when primary is IDENT followed by (...) handled below */
+    | primary '(' argument_expression_list_opt ')'   /* IDENT(...) permitted here because primary can be IDENT */
+    | lvalue_postfix PLUS_PLUS
+    | lvalue_postfix MINUS_MINUS
+    ;
+
+/* primary expressions: literal, IDENT, parenthesized expr */
+primary
+    : INT
+    | FLOAT
+    | STRING
+    | TRUE
+    | FALSE
+    | '(' expr ')'       /* parenthesized expression */
+    | IDENT              /* note: IDENT alone is a valid primary as well as the start of a call or lvalue */
+    ;
+
+/* lvalue: exactly as specified — an identifier optionally followed by one or more bracketed expressions.
+   This allows IDENT and IDENT[expr] and IDENT[expr][expr] ... */
+lvalue
+    : IDENT
+    | lvalue '[' expr ']'
+    ;
+
+/* lvalue_postfix is used to allow postfix ++/-- on an lvalue and to be used where a postfix lvalue is needed */
+lvalue_postfix
+    : lvalue
+    ;
+
+/* argument list for function calls: zero or more expressions separated by commas */
+argument_expression_list_opt
+    : /* empty */
+    | argument_expression_list
+    ;
+
+argument_expression_list
+    : expr
+    | argument_expression_list ',' expr
+    ;
 
 
 %%
