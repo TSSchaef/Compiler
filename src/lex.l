@@ -35,6 +35,17 @@
     FileStack fileStack[STACK_SIZE];
     int fileStackTop = 0;
 
+    char *getOutputFileName(){
+        return outputFileName;
+    }
+
+    char *getCurrentFileName(){
+        if(fileStackTop == 0){
+            return "No file";
+        }
+        return fileStack[fileStackTop - 1].filename;
+    }
+
     void error(const char *msg){
         fprintf(stderr, "Lexer error in file %s line %d at text %s\n\t%s\n",
             fileStack[fileStackTop - 1].filename, yylineno, yytext, msg);
@@ -42,13 +53,23 @@
         exit(1);
     }
 
-    void getOutputFileName(const char *inputFile, char *outputFile) {
+    void generateOutputFileName(const char *inputFile, char *outputFile) {
         const char *dot = strrchr(inputFile, '.');
         if (dot) {
             size_t len = dot - inputFile;
             strncpy(outputFile, inputFile, len);
             outputFile[len] = '\0';
-            strcat(outputFile, ".lexer");
+
+            switch(mode){
+                case 2:
+                    strcat(outputFile, ".lexer");
+                    break;
+                case 3:
+                    strcat(outputFile, ".parser");
+                    break;
+                default:
+                    strcat(outputFile, ".out");
+            }
         } else {
             snprintf(outputFile, MAX_FILE_NAME_SIZE, "%s.lexer", inputFile);
         }
@@ -74,8 +95,8 @@
 
 
         // If first file (all output to one file)
-        if(fileStackTop == 0 && mode == 2) {
-            getOutputFileName(fileStack[fileStackTop].filename, outputFileName);
+        if(fileStackTop == 0) {
+            generateOutputFileName(fileStack[fileStackTop].filename, outputFileName);
 
             //FILE *output = stdout;
             outputFile = fopen(outputFileName, "w");

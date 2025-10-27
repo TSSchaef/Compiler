@@ -9,8 +9,10 @@ char *yyfilename = NULL;
 extern int yylineno;
 extern char *yytext;
 
-//extern char *outputFileName;
-char *tempOutputFile = "outputFile.parse";
+extern FILE *outputFile;
+
+extern char *getOutputFileName();
+extern char *getCurrentFileName();
 
 int yylex(void);
 void yyerror(const char *s);
@@ -313,7 +315,7 @@ argument_expression_list
 
 /* user C code */
 void print_ident(const char *kind, char *name) {
-    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, name);
+    fprintf(outputFile, "File %s Line %d: %s %s\n", getCurrentFileName(), yylineno, kind, name);
     free(name);
 }
 
