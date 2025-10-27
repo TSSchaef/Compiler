@@ -6,7 +6,7 @@ void logUsage(){
 }
 
 void logCompilerInfo(){
-    fprintf(stderr, "My very own C compiler written for COM S 4400, Fall 2025. \n Written by Tyler Schaefer (tschaef@iastate.edu) \n Version 0.0.1-SNAPSHOT, released 12 September, 2025\n");
+    fprintf(stderr, "My very own C compiler written for COM S 4400, Fall 2025. \n Written by Tyler Schaefer (tschaef@iastate.edu) \n Version 0.0.3-SNAPSHOT, released October 29, 2025\n");
 }
 
 void logNotSupported(){
