@@ -84,6 +84,7 @@ void print_ident(const char *kind, char *name);
 /* equality / relational */
 %nonassoc EQUALITY NOT_EQUAL
 %nonassoc '<' '>' LT_EQUAL GT_EQUAL
+%nonassoc LOWER_THAN_ELSE
 
 /* additive / multiplicative */
 %left '+' '-'
@@ -129,48 +130,40 @@ Fun_def : Fun_dec '{' opt_fun_body '}'
         ;
 
 opt_fun_body :
-            | Var opt_fun_body
-            | Stat opt_fun_body
+             | Var opt_fun_body
+             | Stat opt_fun_body
              ;
-
-Stat : ';'
-     | expr ';'
-     | BREAK ';'
-     | CONTINUE ';'
-     | RETURN opt_expr ';' 
-     | IF '(' expr ')' Stat_or_stat_block //opt_else
-     | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' Stat_or_stat_block 
-     | WHILE '(' expr ')' Stat_or_stat_block
-     | DO Stat_or_stat_block WHILE '(' expr ')' ';'
-     ;
-
-Stat_or_stat_block : Stat
-                 | Stat_block
-                 ;
 
 Stat_block : '{' Stat_block_body '}'
            ;
            
 Stat_block_body :
-            | Stat Stat_block_body
-            ;
+                | Stat Stat_block_body
+                ;
 
-opt_else :
-         | ELSE Stat_or_stat_block
-         ;
+Stat : matched_stmt
+     | unmatched_stmt
+     ;
+
+unmatched_stmt : IF '(' expr ')' Stat
+               | IF '(' expr ')' matched_stmt ELSE unmatched_stmt
+               ;
+
+matched_stmt : Stat_block
+             | ';'
+             | expr ';'
+             | BREAK ';'
+             | CONTINUE ';'
+             | RETURN opt_expr ';' 
+             | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' matched_stmt
+             | WHILE '(' expr ')' matched_stmt
+             | DO matched_stmt WHILE '(' expr ')' ';'
+             | IF '(' expr ')' matched_stmt ELSE matched_stmt
+             ;
 
 opt_expr :
          | expr
          ;
-
-opt_expr_list: 
-         | expr
-         | expr ',' expr_list
-         ;
-
-expr_list : expr
-          | expr ',' expr_list
-          ;
 
 expr : assignment_expression
      ;
