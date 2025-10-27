@@ -14,9 +14,13 @@ char *tempOutputFile = "outputFile.parse";
 int yylex(void);
 void yyerror(const char *s);
 
-void print_ident(const char *kind);
+void print_ident(const char *kind, char *name);
 
 %}
+
+%union {
+    char *ident;
+}
 
 /* --- Token numbers to match the lexer --- */
 %token EQUALITY     351
@@ -57,7 +61,7 @@ void print_ident(const char *kind);
 %token INT          303
 %token FLOAT        304
 %token STRING       305
-%token IDENT        306
+%token <ident> IDENT 306
 
 %token HEX          307
 %token BITWISE      308
@@ -95,18 +99,18 @@ C :  Var C
   |
   ;
 
-Var : TYPE IDENT {print_ident("global variable");} opt_array opt_ident_list ';'
+Var : TYPE IDENT {print_ident("global variable", $2);} opt_array opt_ident_list ';'
     ; 
 
 opt_ident_list : 
-           | ',' IDENT {print_ident("global variable");} opt_array opt_ident_list;
+           | ',' IDENT {print_ident("global variable", $2);} opt_array opt_ident_list;
            ;
 
 opt_array :
           | '[' INT ']' 
           ;
 
-Fun_dec : TYPE IDENT {print_ident("function");} '(' opt_param_list ')' 
+Fun_dec : TYPE IDENT {print_ident("function", $2);} '(' opt_param_list ')' 
     ;
 
 opt_empty_array :
@@ -114,11 +118,11 @@ opt_empty_array :
           ;
 
 opt_param_list :
-                | TYPE IDENT {print_ident("parameter");}opt_empty_array opt_param_list_tail
+                | TYPE IDENT {print_ident("parameter", $2);} opt_empty_array opt_param_list_tail
                ;
 
 opt_param_list_tail :
-                     | ',' TYPE IDENT {print_ident("parameter");} opt_empty_array opt_param_list_tail
+                     | ',' TYPE IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
                     ;
 
 Fun_def : Fun_dec '{' opt_fun_body '}' 
@@ -279,14 +283,14 @@ primary
     | TRUE
     | FALSE
     | '(' expr ')'       /* parenthesized expression */
-    | IDENT              /* note: IDENT alone is a valid primary as well as the start of a call or lvalue */
+    | IDENT                  
     ;
 
 /* lvalue: exactly as specified — an identifier optionally followed by one or more bracketed expressions.
    This allows IDENT and IDENT[expr] and IDENT[expr][expr] ... */
 lvalue
-    : IDENT {print_ident("local variable");}
-    | lvalue {print_ident("local variable");} '[' expr ']' 
+    : IDENT {print_ident("local variable", $1);}
+    | lvalue '[' expr ']' 
     ;
 
 /* lvalue_postfix is used to allow postfix ++/-- on an lvalue and to be used where a postfix lvalue is needed */
@@ -307,8 +311,9 @@ argument_expression_list
 %%
 
 /* user C code */
-void print_ident(const char *kind) {
-    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, yytext);
+void print_ident(const char *kind, char *name) {
+    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, name);
+    free(name);
 }
 
 void yyerror(const char *s) {

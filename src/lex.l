@@ -10,6 +10,7 @@
 
     #include "global.h"
 
+    extern YYSTYPE yylval;
 
     #define STACK_SIZE 512 
     #define FILE_SIZE 256
@@ -252,6 +253,9 @@ int|float|char|void         { printToken(TYPE); return TYPE; }
                                     error("Identifier length excedes max length");
                                     return 0;
                                 }
+
+                                yylval.ident = strdup(yytext);
+
                                 printToken(IDENT);
                                 return IDENT;
                             }
