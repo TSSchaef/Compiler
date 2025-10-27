@@ -14,7 +14,7 @@ char *tempOutputFile = "outputFile.parse";
 int yylex(void);
 void yyerror(const char *s);
 
-void print_parser(const char *kind, const char *ident);
+void print_ident(const char *kind);
 
 %}
 
@@ -95,18 +95,18 @@ C :  Var C
   |
   ;
 
-Var : TYPE IDENT opt_array opt_ident_list ';' {print_parser("global variable", "ident");}
+Var : TYPE IDENT {print_ident("global variable");} opt_array opt_ident_list ';'
     ; 
 
 opt_ident_list : 
-           | ',' IDENT opt_array opt_ident_list;
+           | ',' IDENT {print_ident("global variable");} opt_array opt_ident_list;
            ;
 
 opt_array :
           | '[' INT ']' 
           ;
 
-Fun_dec : TYPE IDENT '(' opt_param_list ')' {print_parser("function ", "ident");}
+Fun_dec : TYPE IDENT {print_ident("function");} '(' opt_param_list ')' 
     ;
 
 opt_empty_array :
@@ -114,14 +114,14 @@ opt_empty_array :
           ;
 
 opt_param_list :
-                | TYPE IDENT opt_empty_array opt_param_list_tail
+                | TYPE IDENT {print_ident("parameter");}opt_empty_array opt_param_list_tail
                ;
 
 opt_param_list_tail :
-                     | ',' TYPE IDENT opt_empty_array opt_param_list_tail
+                     | ',' TYPE IDENT {print_ident("parameter");} opt_empty_array opt_param_list_tail
                     ;
 
-Fun_def : Fun_dec '{' opt_fun_body '}'
+Fun_def : Fun_dec '{' opt_fun_body '}' 
         ;
 
 opt_fun_body :
@@ -285,8 +285,8 @@ primary
 /* lvalue: exactly as specified — an identifier optionally followed by one or more bracketed expressions.
    This allows IDENT and IDENT[expr] and IDENT[expr][expr] ... */
 lvalue
-    : IDENT
-    | lvalue '[' expr ']'
+    : IDENT {print_ident("local variable");}
+    | lvalue {print_ident("local variable");} '[' expr ']' 
     ;
 
 /* lvalue_postfix is used to allow postfix ++/-- on an lvalue and to be used where a postfix lvalue is needed */
@@ -304,13 +304,11 @@ argument_expression_list
     : expr
     | argument_expression_list ',' expr
     ;
-
-
 %%
 
 /* user C code */
-void print_parser(const char *kind, const char *ident) {
-    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, ident);
+void print_ident(const char *kind) {
+    printf("File %s Line %d: %s %s\n", tempOutputFile, yylineno, kind, yytext);
 }
 
 void yyerror(const char *s) {
