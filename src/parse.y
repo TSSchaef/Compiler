@@ -105,28 +105,102 @@ opt_fun_body :
              ;
 
 Stat : ';'
+     | expr ';'
+     | BREAK ';'
+     | CONTINUE ';'
      | RETURN opt_expr ';' 
-     //| IF '(' expr ')' Stat opt_else
-     | WHILE '(' expr ')' Stat
-     | DO Stat WHILE '(' expr ')' ';'
-     | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' Stat
+     | IF '(' expr ')' Stat_or_stat_block //opt_else
+     | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' Stat_or_stat_block 
+     | WHILE '(' expr ')' Stat_or_stat_block
+     | DO Stat_or_stat_block WHILE '(' expr ')' ';'
      ;
 
+Stat_or_stat_block : Stat
+                 | Stat_block
+                 ;
+
+Stat_block : '{' Stat_block_body '}'
+           ;
+           
+Stat_block_body :
+            | Stat Stat_block_body
+            ;
+
 opt_else :
-          | ELSE Stat
-          ;
+         | ELSE Stat_or_stat_block
+         ;
 
 opt_expr :
-          | expr
-          ;
+         | expr
+         ;
 
-expr : IDENT
-     | INT
+expr_list: 
+         | expr
+         | expr ',' expr_list_tail
+         ;
+
+expr_list_tail: expr
+              | expr ',' expr_list_tail
+              ;
+
+expr : INT
      | FLOAT
      | STRING
      | TRUE
      | FALSE
+     | IDENT '(' expr_list ')'
+     | lvalue
+     | lvalue assignment_op expr
+     | inc_dec_op lvalue
+     | lvalue inc_dec_op
+     | unary_op expr
+     | expr binary_op expr
+     | expr '?' expr ':' expr
+     | '(' TYPE ')' expr
+     | '(' expr ')'
      ;
+
+inc_dec_op : PLUS_PLUS
+            | MINUS_MINUS
+            ;
+
+assignment_op : '='
+               | PLUS_EQUAL
+               | MINUS_EQUAL
+               | TIMES_EQUAL
+               | DIVIDE_EQUAL
+               | MODULO_EQUAL
+               ;
+unary_op : '-' 
+          | '!'
+          | '~'
+          //| BITWISE
+          ;
+
+binary_op : '+'
+           | '-'
+           | '*'
+           | '/'
+           | '%'
+           | EQUALITY
+           | NOT_EQUAL
+           | '<'
+           | '>'
+           | LT_EQUAL
+           | GT_EQUAL
+           | AND_AND
+           | OR_OR
+           | '&'
+           | '|'
+           //| BITWISE
+           ;
+
+lvalue : IDENT
+    | IDENT '[' expr ']' 
+    //| lvalue '.' IDENT
+    ;
+
+
 
 %%
 
