@@ -102,40 +102,53 @@ void print_ident(const char *kind, char *name);
 
 C :  Var C
   | Fun_def C
+  | Fun_proto C
   |
   ;
 
-Var : TYPE IDENT {print_ident("global variable", $2);} opt_array opt_ident_list ';'
+opt_const_type : CONST TYPE 
+               | TYPE CONST
+               | TYPE
+               ;
+
+Var : opt_const_type IDENT {print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';'
     ; 
 
 opt_ident_list : 
-           | ',' IDENT {print_ident("global variable", $2);} opt_array opt_ident_list;
+           | ',' IDENT {print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list;
            ;
 
-Var_local : TYPE IDENT {print_ident("local variable", $2);} opt_array opt_ident_local_list ';'
+Var_local : opt_const_type IDENT {print_ident("local variable", $2);} opt_array opt_assignment opt_ident_local_list ';'
     ; 
 
 opt_ident_local_list : 
-           | ',' IDENT {print_ident("local variable", $2);} opt_array opt_ident_local_list;
+           | ',' IDENT {print_ident("local variable", $2);} opt_array opt_assignment opt_ident_local_list;
            ;
 
 opt_array :
           | '[' INT ']' 
           ;
 
-Fun_dec : TYPE IDENT {print_ident("function", $2);} '(' opt_param_list ')' 
+opt_assignment :
+               | '=' expr 
+               ;
+
+Fun_dec : opt_const_type IDENT {print_ident("function", $2);} '(' opt_param_list ')' 
     ;
+
+Fun_proto : Fun_dec ';' 
+          ;
 
 opt_empty_array :
           | '[' ']' 
           ;
 
 opt_param_list :
-                | TYPE IDENT {print_ident("parameter", $2);} opt_empty_array opt_param_list_tail
+                | opt_const_type IDENT {print_ident("parameter", $2);} opt_empty_array opt_param_list_tail
                ;
 
 opt_param_list_tail :
-                     | ',' TYPE IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
+                     | ',' opt_const_type IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
                     ;
 
 Fun_def : Fun_dec '{' opt_fun_body '}' 
@@ -262,7 +275,7 @@ unary_expression
     | '-' unary_expression %prec UMINUS
     | '!' unary_expression
     | '~' unary_expression
-    | '(' TYPE ')' unary_expression    // cast: (TYPE) expr  
+    | '(' opt_const_type ')' unary_expression    // cast: (TYPE) expr  
     | postfix_expression
     ;
 
