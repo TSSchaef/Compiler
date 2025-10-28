@@ -311,12 +311,13 @@ primary
     | TRUE
     | FALSE
     | '(' expr ')'       /* parenthesized expression */
-    | IDENT                  
+    | lvalue
     ;
 
-/* lvalue: an identifier optionally by brackets. Only 1 dimensional arrays for the class */
 lvalue : IDENT 
     | IDENT '[' expr ']' 
+    | lvalue '.' IDENT
+    | lvalue '.' IDENT '[' expr ']'
     ;
 
 lvalue_postfix
