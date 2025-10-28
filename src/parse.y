@@ -193,9 +193,8 @@ opt_expr :
 expr : assignment_expression
      ;
 
-/* Assignment: includes all allowed assignment operators, right-associative */
-assignment_expression
-    : conditional_expression
+//Assignment is right associative
+assignment_expression : conditional_expression
     | lvalue '=' assignment_expression
     | lvalue PLUS_EQUAL assignment_expression
     | lvalue MINUS_EQUAL assignment_expression
@@ -204,30 +203,24 @@ assignment_expression
     | lvalue MODULO_EQUAL assignment_expression
     ;
 
-/* Conditional (ternary) - right associative in the grammar by using conditional_expression on the RHS */
-conditional_expression
-    : logical_or_expression
+//Right associative ternary
+conditional_expression : logical_or_expression
     | logical_or_expression '?' expr ':' conditional_expression
     ;
 
-/* Logical / bitwise precedence chain */
-logical_or_expression
-    : logical_and_expression
+logical_or_expression : logical_and_expression
     | logical_or_expression OR_OR logical_and_expression
     ;
 
-logical_and_expression
-    : bitwise_or_expression
+logical_and_expression : bitwise_or_expression
     | logical_and_expression AND_AND bitwise_or_expression
     ;
 
-bitwise_or_expression
-    : bitwise_xor_expression
+bitwise_or_expression : bitwise_xor_expression
     | bitwise_or_expression '|' bitwise_xor_expression
     ;
 
-bitwise_xor_expression
-    : bitwise_and_expression
+bitwise_xor_expression : bitwise_and_expression
     | bitwise_xor_expression '^' bitwise_and_expression
     ;
 
@@ -236,50 +229,41 @@ bitwise_and_expression
     | bitwise_and_expression '&' equality_expression
     ;
 
-/* equality / relational */
-equality_expression
-    : relational_expression
+equality_expression : relational_expression
     | equality_expression EQUALITY relational_expression
     | equality_expression NOT_EQUAL relational_expression
     ;
 
-relational_expression
-    : additive_expression
+relational_expression : additive_expression
     | relational_expression '<' additive_expression
     | relational_expression '>' additive_expression
     | relational_expression LT_EQUAL additive_expression
     | relational_expression GT_EQUAL additive_expression
     ;
 
-/* additive / multiplicative */
-additive_expression
-    : multiplicative_expression
+additive_expression : multiplicative_expression
     | additive_expression '+' multiplicative_expression
     | additive_expression '-' multiplicative_expression
     ;
 
-multiplicative_expression
-    : unary_expression
+multiplicative_expression : unary_expression
     | multiplicative_expression '*' unary_expression
     | multiplicative_expression '/' unary_expression
     | multiplicative_expression '%' unary_expression
     ;
 
-/* Unary expressions: prefix ++/-- on l-value handled here as pre-increment, also unary ops and casts.
-   Note: postfix ++/-- are handled via lvalue_postfix below (so we can match "lvalue inc_dec_op" and "inc_dec_op lvalue"). */
-unary_expression
-    : INCRDEC_PREFIX
+unary_expression : INCRDEC_PREFIX
     | '&' unary_expression
     | '*' unary_expression
     | '+' unary_expression
     | '-' unary_expression %prec UMINUS
     | '!' unary_expression
     | '~' unary_expression
-    | '(' opt_const_type ')' unary_expression    // cast: (TYPE) expr  
+    | '(' opt_const_type ')' unary_expression    // casting: (TYPE) expr  
     | postfix_expression
     ;
 
-/* helper nonterminal for prefix ++/-- form that must be followed by an lvalue */
+/* helper nonterminal for prefix ++/-- form */
 INCRDEC_PREFIX
     : PLUS_PLUS lvalue
     | MINUS_MINUS lvalue
@@ -287,13 +271,12 @@ INCRDEC_PREFIX
 
 /* postfix_expression covers primary and function-call form IDENT(expr-list) and lvalue-postfix inc/dec */
 postfix_expression
-    : primary                      /* includes function-call form when primary is IDENT followed by (...) handled below */
-    | primary '(' argument_expression_list_opt ')'   /* IDENT(...) permitted here because primary can be IDENT */
+    : primary                      
+    | primary '(' argument_expression_list_opt ')'   
     | lvalue_postfix PLUS_PLUS
     | lvalue_postfix MINUS_MINUS
     ;
 
-/* primary expressions: literal, IDENT, parenthesized expr */
 primary
     : INT
     | FLOAT
@@ -304,26 +287,20 @@ primary
     | IDENT                  
     ;
 
-/* lvalue: exactly as specified — an identifier optionally followed by one or more bracketed expressions.
-   This allows IDENT and IDENT[expr] and IDENT[expr][expr] ... */
-lvalue
-    : IDENT 
-    | lvalue '[' expr ']' 
+/* lvalue: an identifier optionally followed by one or more bracketed expressions. Only 1 dimensional arrays for the class */
+lvalue : IDENT 
+    | IDENT '[' expr ']' 
     ;
 
-/* lvalue_postfix is used to allow postfix ++/-- on an lvalue and to be used where a postfix lvalue is needed */
 lvalue_postfix
     : lvalue
     ;
 
-/* argument list for function calls: zero or more expressions separated by commas */
-argument_expression_list_opt
-    : /* empty */
+argument_expression_list_opt : 
     | argument_expression_list
     ;
 
-argument_expression_list
-    : expr
+argument_expression_list : expr
     | argument_expression_list ',' expr
     ;
 %%
