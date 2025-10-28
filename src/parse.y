@@ -101,14 +101,19 @@ void print_ident(const char *kind, char *name);
 %%
 
 C :  Var C
+  | Struct_def C
   | Fun_def C
   | Fun_proto C
   |
   ;
 
-opt_const_type : CONST TYPE 
-               | TYPE CONST
-               | TYPE
+type_with_struct : TYPE
+                 | STRUCT IDENT 
+                 ;
+
+opt_const_type : CONST type_with_struct
+               | type_with_struct CONST
+               | type_with_struct
                ;
 
 Var : opt_const_type IDENT {print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';'
@@ -123,6 +128,25 @@ Var_local : opt_const_type IDENT {print_ident("local variable", $2);} opt_array 
 
 opt_ident_local_list : 
            | ',' IDENT {print_ident("local variable", $2);} opt_array opt_assignment opt_ident_local_list;
+           ;
+
+
+
+Struct_def : STRUCT IDENT {print_ident("global struct", $2);} '{' Struct_members '}' ';' 
+           ;
+
+Struct_local_def : STRUCT IDENT {print_ident("local struct", $2);} '{' Struct_members '}' ';' 
+           ;
+
+Struct_members : Struct_member Struct_members
+               |
+               ;
+
+Struct_member : opt_const_type IDENT {print_ident("member", $2);} opt_array opt_member_list ';'
+              ;
+
+opt_member_list : 
+           | ',' IDENT {print_ident("member", $2);} opt_array opt_member_list;
            ;
 
 opt_array :
@@ -156,6 +180,7 @@ Fun_def : Fun_dec '{' opt_fun_body '}'
 
 opt_fun_body :
              | Var_local opt_fun_body
+             | Struct_local_def opt_fun_body
              | Stat opt_fun_body
              ;
 
@@ -281,6 +306,8 @@ primary
     : INT
     | FLOAT
     | STRING
+    | CHAR
+    | HEX
     | TRUE
     | FALSE
     | '(' expr ')'       /* parenthesized expression */
