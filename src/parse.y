@@ -287,7 +287,7 @@ primary
     | IDENT                  
     ;
 
-/* lvalue: an identifier optionally followed by one or more bracketed expressions. Only 1 dimensional arrays for the class */
+/* lvalue: an identifier optionally by brackets. Only 1 dimensional arrays for the class */
 lvalue : IDENT 
     | IDENT '[' expr ']' 
     ;
