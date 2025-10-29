@@ -1,26 +1,34 @@
 tschaef Compiler
 ===================
 
-## Usage 
-All source code is within the source folder. Calling "make" will use the Makefile to create the executable "mycc". This can be used with this format:
-
-mycc -mode infile
-
-mode: integer (1-5)
-
-infile: filepath to code for compilation 
-
-"make clean" can be used to remove all object, binary, and dependency files generated.
-
 ## Dependencies
 
-Flex is used to for the lexer to convert the regular expressions into a DFA in C. It can be installed on UNIX with:
+- Flex is used to for the lexer to convert the regular expressions into a DFA in C. It can be installed on UNIX with:
 
     `sudo apt-get install flex`
 
-Bison is used for the parser to convert the context free grammar into a Look-Ahead LR(1) parser. It can be installed on UNIX with:
+- Bison is used for the parser to convert the context free grammar into a Look-Ahead LR(1) parser. It can be installed on UNIX with:
     
     `sudo apt-get install bison`
+
+
+## Usage 
+All source code is within the source folder. Calling 
+    
+    `make` 
+
+will use the Makefile to create the executable "mycc". This can be used with this format:
+
+    `./mycc -mode infile`
+
+mode: integer (1-5)
+infile: filepath to code for compilation 
+
+
+To remove all object, binary, and dependency files generated use: 
+
+    `make clean`
+
 
 ## Modes
 
