@@ -341,4 +341,5 @@ void print_ident(const char *kind, char *name) {
 
 void yyerror(const char *s) {
     fprintf(stderr, "Parser error in file %s line %d at text %s \n\t %s \n", getCurrentFileName(), yylineno, yytext, s);
+    remove(getOutputFileName());
 }
