@@ -1,9 +1,15 @@
 #include "typecheck.h"
 
+extern int yylineno;
+extern char *yytext;
+
+extern FILE *outputFile;
+
+extern char *getOutputFileName();
+extern char *getCurrentFileName();
 
 void type_check(AST *root){
-
-    switch (root->kind) {
+    /*switch (root->kind) {
         case AST_INT_LITERAL:
             root->type = type_int();
             break;
@@ -24,6 +30,6 @@ void type_check(AST *root){
 
             root->type = type_int();
             break;
-    }
+    }*/
 }
 

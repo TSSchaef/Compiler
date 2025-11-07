@@ -33,6 +33,14 @@ int main(int argc, char *argv[]){
             break;
 
         case 4:
+            if(pushFile(argv[2]) != 0){
+               return -1;
+            }
+
+            yyparse();
+
+            break;
+
         case 5:
             logNotSupported();
             break;

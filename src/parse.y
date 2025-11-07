@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-char *yyfilename = NULL;
+#include "global.h"
 
 extern int yylineno;
 extern char *yytext;
@@ -335,7 +335,11 @@ argument_expression_list : expr
 
 /* user C code */
 void print_ident(const char *kind, char *name) {
-    fprintf(outputFile, "File %s Line %d: %s %s\n", getCurrentFileName(), yylineno, kind, name);
+    // Only print parsing information in mode 3
+    if(mode == 3){
+        fprintf(outputFile, "File %s Line %d: %s %s\n", getCurrentFileName(), yylineno, kind, name);
+    }
+
     free(name);
 }
 

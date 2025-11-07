@@ -67,6 +67,9 @@
                 case 3:
                     strcat(outputFile, ".parser");
                     break;
+                case 4:
+                    strcat(outputFile, ".types");
+                    break;
                 default:
                     strcat(outputFile, ".out");
             }
