@@ -12,7 +12,7 @@ int yylex(void);
 int yyparse(void);
 
 int mode;
-AST *root;
+AST *root_ast;
 
 int main(int argc, char *argv[]){
     switch(mode = handleInputs(argv, argc)){
@@ -43,7 +43,8 @@ int main(int argc, char *argv[]){
 
             init_symtab();
             yyparse();
-            type_check(root);
+            ast_print(root_ast);
+            type_check(root_ast);
 
             break;
 

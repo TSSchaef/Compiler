@@ -2,6 +2,6 @@
 #define GLOBAL_H
 
 extern int mode;
-extern struct AST *root;
+extern struct AST *root_ast;
 
 #endif

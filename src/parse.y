@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "global.h"
+#include "ast.h"
+#include "symtab.h"
 
 extern int yylineno;
 extern char *yytext;
@@ -24,7 +26,10 @@ void print_ident(const char *kind, char *name);
 %}
 
 %union {
+    struct AST *ast;
+    int intval;
     char *ident;
+    struct Type *type;
 }
 
 /* --- Token numbers to match the lexer --- */
@@ -72,6 +77,8 @@ void print_ident(const char *kind, char *name);
 %token BITWISE      308
 
 
+%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_const_type type_with_struct opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr
+
 
 /* Precedence/associativity (list from lowest precedence to highest) */
 %left ','
@@ -100,14 +107,20 @@ void print_ident(const char *kind, char *name);
 
 %%
 
-C :  Var C
-  | Struct_def C
-  | Fun_def C
-  | Fun_proto C
-  |
+Program : C {
+                root_ast = ast_block_from_list($1);
+                $$ = root_ast;
+            } 
+        ;
+
+C :  Var C          { $$ = ast_list_prepend($1, $2); }
+    | Struct_def C  { $$ = ast_list_prepend($1, $2); }
+    | Fun_def C     { $$ = ast_list_prepend($1, $2); }
+    | Fun_proto C   { $$ = ast_list_prepend($1, $2); }
+    |               {$$ = NULL;}
   ;
 
-type_with_struct : TYPE
+type_with_struct : TYPE             
                  | STRUCT IDENT 
                  ;
 

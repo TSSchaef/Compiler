@@ -3,20 +3,16 @@
 #include <stdio.h>
 #include "symtab.h"
 
-/* ===== Configuration ===== */
 #define DEFAULT_BUCKETS 211   // Good prime number for hashing
 
-/* ===== Current Scope Pointer ===== */
 static Scope *current_scope = NULL;
 
-/* ===== Simple Hash Function ===== */
 static unsigned hash(const char *s, int mod) {
     unsigned h = 0;
     while (*s) h = 31*h + (unsigned char)*s++;
     return h % mod;
 }
 
-/* ===== Scope Creation ===== */
 static Scope *new_scope(Scope *parent) {
     Scope *s = malloc(sizeof(Scope));
     s->bucket_count = DEFAULT_BUCKETS;
@@ -24,8 +20,6 @@ static Scope *new_scope(Scope *parent) {
     s->parent = parent;
     return s;
 }
-
-/* ===== Public API ===== */
 
 void init_symtab() {
     current_scope = new_scope(NULL); // global scope
