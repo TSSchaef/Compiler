@@ -3,31 +3,27 @@
 
 #include <stdbool.h>
 
-/* ===== Type System Forward Declaration ===== */
-typedef struct Type Type;   // You'll implement this later
+typedef struct Type Type; // forward declare for type system
 
-/* ===== Symbol ===== */
 typedef struct Symbol {
     char *name;
     Type *type;
-    struct Symbol *next;  // Linked list for hash bucket
+    struct Symbol *next;
 } Symbol;
 
-/* ===== Scope ===== */
 typedef struct Scope {
-    Symbol **table;        // Hash table (array of buckets)
-    int bucket_count;      // Usually prime, e.g. 211
-    struct Scope *parent;  // Parent scope
+    Symbol **table;
+    int bucket_count;
+    struct Scope *parent;
 } Scope;
 
-/* ===== API ===== */
-void init_symtab();        // Initialize global scope
-void enter_scope();        // Push new scope
-void exit_scope();         // Pop scope
+// API
+void init_symtab();         // call once at start
+void enter_scope();         // call on block/function entry
+void exit_scope();          // call on block/function exit
 
 bool add_symbol(const char *name, Type *type);
-Symbol *lookup_symbol(const char *name);       // search current and parents
-Symbol *lookup_symbol_current(const char *name); // search only this scope
+Symbol *lookup_symbol(const char *name);           // search current + ancestors
+Symbol *lookup_symbol_current(const char *name);   // search only current scope
 
 #endif
-

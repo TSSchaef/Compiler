@@ -2,6 +2,9 @@
 #include <stdlib.h>
 
 #include "logging.h"
+#include "symtab.h"
+#include "ast.h"
+#include "typecheck.h"
 #include "stack.h"
 
 // For lex and bison
@@ -9,6 +12,7 @@ int yylex(void);
 int yyparse(void);
 
 int mode;
+AST *root;
 
 int main(int argc, char *argv[]){
     switch(mode = handleInputs(argv, argc)){
@@ -37,7 +41,9 @@ int main(int argc, char *argv[]){
                return -1;
             }
 
+            init_symtab();
             yyparse();
+            type_check(root);
 
             break;
 

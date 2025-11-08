@@ -11,6 +11,8 @@ typedef enum {
     // ... add more (return, if, while, etc.)
 } ASTKind;
 
+struct Type; // forward declare for type checking and symbol table
+
 typedef struct AST {
     ASTKind kind;
     struct Type *type;        // Set later by type checker
@@ -27,11 +29,12 @@ typedef struct AST {
         struct {
             char *name;
             struct Type *decl_type;
+            struct AST *init; // allow initializer
         } decl;
 
         struct {
             char *name;
-            struct AST *params;
+            struct AST *params; // linked list of param decls
             struct AST *body;
         } func;
 
@@ -42,11 +45,16 @@ typedef struct AST {
     };
 } AST;
 
+// Node constructors
 AST *ast_int(int v);
 AST *ast_id(char *name);
 AST *ast_binop(char op, AST *l, AST *r);
+AST *ast_decl(char *name, struct Type *decl_type, AST *init);
+AST *ast_func(char *name, AST *params, AST *body);
+AST *ast_block(AST **statements, int count);
+
+// Utility
 void ast_free(AST *node);
 void ast_print(AST *node);
 
 #endif
-

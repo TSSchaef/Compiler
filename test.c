@@ -1,6 +1,7 @@
 
 float A;
 
+
 int f(int A[], int n)
 {
 A;
