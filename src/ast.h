@@ -1,8 +1,14 @@
 #ifndef AST_H
 #define AST_H
 
+#include <stdbool.h>
+
 typedef enum {
     AST_INT_LITERAL,
+    AST_FLOAT_LITERAL,
+    AST_STRING_LITERAL,
+    AST_CHAR_LITERAL,
+    AST_BOOL_LITERAL,
     AST_ID,
     AST_BINOP,
     AST_DECL,
@@ -22,6 +28,11 @@ typedef struct AST {
 
     union {
         int intval;
+        float floatval;
+        char *strval;
+        char charval;
+        bool boolval;
+
         char *id;
 
         struct {
@@ -52,6 +63,11 @@ typedef struct AST {
 // Node constructors
 AST *ast_int(int v);
 AST *ast_id(const char *name);
+AST *ast_float(double v);
+AST *ast_string(char *s);
+AST *ast_char(char c);
+AST *ast_bool(bool b);
+
 AST *ast_binop(char op, AST *l, AST *r);
 AST *ast_decl(const char *name, struct Type *decl_type, AST *init);
 AST *ast_func(const char *name, AST *params, AST *body);

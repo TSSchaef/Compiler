@@ -27,7 +27,13 @@ void print_ident(const char *kind, char *name);
 
 %union {
     struct AST *ast;
+
     int intval;
+    float floatval;
+    bool boolval;
+    char charval;
+    char *strval;
+
     char *ident;
     struct Type *type;
 }
@@ -64,16 +70,18 @@ void print_ident(const char *kind, char *name);
 %token DEFAULT      413
 %token TRUE         414
 %token FALSE        415
-%token BOOL         416
 
-%token TYPE         301
-%token CHAR         302
-%token INT          303
-%token FLOAT        304
-%token STRING       305
-%token <ident> IDENT 306
+%token <boolval>    BOOL    416
 
-%token HEX          307
+%token TYPE                 301
+%token <charval>    CHAR    302
+%token <intval>     INT     303
+%token <floatval>   FLOAT   304
+%token <strval>     STRING  305
+%token <ident>      IDENT   306
+
+%token <intval>     HEX     307
+
 %token BITWISE      308
 
 
@@ -124,24 +132,62 @@ type_with_struct : TYPE
                  | STRUCT IDENT 
                  ;
 
+
 opt_const_type : CONST type_with_struct
                | type_with_struct CONST
                | type_with_struct
                ;
 
-Var : opt_const_type IDENT {print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';'
-    ; 
+
+Var : opt_const_type IDENT  { print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';' 
+            {
+                if($4 != NULL){
+                    $$ = ast_binop('=', ast_id($2), $4);
+                } else {
+                    $$ = ast_id($2);
+                }
+            };
+
+
 
 opt_ident_list : 
-           | ',' IDENT {print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list;
-           ;
+           | ',' IDENT  { print_ident("global variable", $2); } opt_array opt_assignment opt_ident_list
+            {
+                if($4 != NULL){
+                    $$ = ast_binop('=', ast_id($2), $4);
+                } else {
+                    $$ = ast_id($2);
+                }
+            };
 
-Var_local : opt_const_type IDENT {print_ident("local variable", $2);} opt_array opt_assignment opt_ident_local_list ';'
-    ; 
+
+
+Var_local : opt_const_type IDENT    {
+                                        print_ident("local variable", $2);
+                                    }
+            opt_array opt_assignment opt_ident_local_list ';'
+                {
+                    if($4 != NULL){
+                        $$ = ast_binop('=', ast_id($2), $4);
+                    } else {
+                        $$ = ast_id($2);
+                    }
+                };
+
+
 
 opt_ident_local_list : 
-           | ',' IDENT {print_ident("local variable", $2);} opt_array opt_assignment opt_ident_local_list;
-           ;
+           | ',' IDENT  {
+                            print_ident("local variable", $2);
+                        } 
+        opt_array opt_assignment opt_ident_local_list
+            {
+                if($4 != NULL){
+                    $$ = ast_binop('=', ast_id($2), $4);
+                } else {
+                    $$ = ast_id($2);
+                }
+            };
 
 
 
@@ -166,12 +212,18 @@ opt_array :
           | '[' INT ']' 
           ;
 
-opt_assignment :
-               | '=' expr 
+
+
+
+opt_assignment :            { $$ = NULL; }
+               | '=' expr   { $$ = $2; }
                ;
 
-Fun_dec : opt_const_type IDENT {print_ident("function", $2);} '(' opt_param_list ')' 
-    ;
+
+
+Fun_dec : opt_const_type IDENT {print_ident("function", $2);} '(' opt_param_list ')'    {
+            //ast_func($2, $4, AST *body);
+         };
 
 Fun_proto : Fun_dec ';' 
           ;
@@ -188,8 +240,11 @@ opt_param_list_tail :
                      | ',' opt_const_type IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
                     ;
 
+
 Fun_def : Fun_dec '{' opt_fun_body '}' 
         ;
+
+
 
 opt_fun_body :
              | Var_local opt_fun_body
@@ -197,20 +252,26 @@ opt_fun_body :
              | Stat opt_fun_body
              ;
 
+
+
 Stat_block : '{' Stat_block_body '}'
            ;
-           
+
+
 Stat_block_body :
                 | Stat Stat_block_body
                 ;
+
 
 Stat : matched_stmt
      | unmatched_stmt
      ;
 
+
 unmatched_stmt : IF '(' expr ')' Stat
                | IF '(' expr ')' matched_stmt ELSE unmatched_stmt
                ;
+
 
 matched_stmt : Stat_block
              | ';'
@@ -224,12 +285,16 @@ matched_stmt : Stat_block
              | IF '(' expr ')' matched_stmt ELSE matched_stmt
              ;
 
+
 opt_expr :
          | expr
          ;
 
+
 expr : assignment_expression
      ;
+
+
 
 //Assignment is right associative
 assignment_expression : conditional_expression
@@ -241,36 +306,44 @@ assignment_expression : conditional_expression
     | lvalue MODULO_EQUAL assignment_expression
     ;
 
+
 //Right associative ternary
 conditional_expression : logical_or_expression
     | logical_or_expression '?' expr ':' conditional_expression
     ;
 
+
 logical_or_expression : logical_and_expression
     | logical_or_expression OR_OR logical_and_expression
     ;
+
 
 logical_and_expression : bitwise_or_expression
     | logical_and_expression AND_AND bitwise_or_expression
     ;
 
+
 bitwise_or_expression : bitwise_xor_expression
     | bitwise_or_expression '|' bitwise_xor_expression
     ;
 
+
 bitwise_xor_expression : bitwise_and_expression
     | bitwise_xor_expression '^' bitwise_and_expression
     ;
+
 
 bitwise_and_expression
     : equality_expression
     | bitwise_and_expression '&' equality_expression
     ;
 
+
 equality_expression : relational_expression
     | equality_expression EQUALITY relational_expression
     | equality_expression NOT_EQUAL relational_expression
     ;
+
 
 relational_expression : additive_expression
     | relational_expression '<' additive_expression
@@ -279,16 +352,19 @@ relational_expression : additive_expression
     | relational_expression GT_EQUAL additive_expression
     ;
 
+
 additive_expression : multiplicative_expression
     | additive_expression '+' multiplicative_expression
     | additive_expression '-' multiplicative_expression
     ;
+
 
 multiplicative_expression : unary_expression
     | multiplicative_expression '*' unary_expression
     | multiplicative_expression '/' unary_expression
     | multiplicative_expression '%' unary_expression
     ;
+
 
 unary_expression : INCRDEC_PREFIX
     | '&' unary_expression
@@ -301,11 +377,13 @@ unary_expression : INCRDEC_PREFIX
     | postfix_expression
     ;
 
+
 /* helper nonterminal for prefix ++/-- form */
 INCRDEC_PREFIX
     : PLUS_PLUS lvalue
     | MINUS_MINUS lvalue
     ;
+
 
 /* postfix_expression covers primary and function-call form IDENT(expr-list) and lvalue-postfix inc/dec */
 postfix_expression
@@ -315,17 +393,20 @@ postfix_expression
     | lvalue_postfix MINUS_MINUS
     ;
 
+
 primary
-    : INT
-    | FLOAT
-    | STRING
-    | CHAR
-    | HEX
-    | TRUE
-    | FALSE
-    | '(' expr ')'       /* parenthesized expression */
-    | lvalue
+    : INT           { $$ = ast_int($1); }
+    | FLOAT         { $$ = ast_float($1); }
+    | STRING        { $$ = ast_string($1); }
+    | CHAR          { $$ = ast_char($1); }
+    | HEX           { $$ = ast_int($1); }
+    | BOOL          { $$ = ast_bool($1); }
+    | TRUE          { $$ = ast_bool(true); }
+    | FALSE         { $$ = ast_bool(false); }
+    | '(' expr ')'  { $$ = $2; }
+    | lvalue        { /*$$ = ast_id($1);*/ }
     ;
+
 
 lvalue : IDENT 
     | IDENT '[' expr ']' 
@@ -333,18 +414,24 @@ lvalue : IDENT
     | lvalue '.' IDENT '[' expr ']'
     ;
 
+
 lvalue_postfix
     : lvalue
     ;
+
 
 argument_expression_list_opt : 
     | argument_expression_list
     ;
 
+
 argument_expression_list : expr
     | argument_expression_list ',' expr
     ;
+
 %%
+
+
 
 /* user C code */
 void print_ident(const char *kind, char *name) {

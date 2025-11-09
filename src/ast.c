@@ -25,6 +25,46 @@ AST *ast_id(const char *name) {
     return n;
 }
 
+AST *ast_float(double v){
+    AST *n = malloc(sizeof(AST));
+    memset(n, 0, sizeof(AST));
+    n->kind = AST_FLOAT_LITERAL;
+    n->floatval = v;
+    n->type = NULL;
+    n->next = NULL;
+    return n;
+}
+
+AST *ast_string(char *s){
+    AST *n = malloc(sizeof(AST));
+    memset(n, 0, sizeof(AST));
+    n->kind = AST_STRING_LITERAL;
+    n->strval = strdup(s ? s : "");
+    n->type = NULL;
+    n->next = NULL;
+    return n;
+}
+
+AST *ast_char(char c){
+    AST *n = malloc(sizeof(AST));
+    memset(n, 0, sizeof(AST));
+    n->kind = AST_CHAR_LITERAL;
+    n->charval = c;
+    n->type = NULL;
+    n->next = NULL;
+    return n;
+}
+
+AST *ast_bool(bool b){
+    AST *n = malloc(sizeof(AST));
+    memset(n, 0, sizeof(AST));
+    n->kind = AST_CHAR_LITERAL;
+    n->boolval = b;
+    n->type = NULL;
+    n->next = NULL;
+    return n;
+}
+
 AST *ast_binop(char op, AST *l, AST *r) {
     AST *n = malloc(sizeof(AST));
     memset(n, 0, sizeof(AST));

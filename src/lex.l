@@ -4,6 +4,7 @@
     // Definitions and includes
     #include <stdio.h>
     #include <libgen.h>
+    #include <stdbool.h>
 
     // For token definitions, so they're only in one place
     #include "parse.tab.h"
