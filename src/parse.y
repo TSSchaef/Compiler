@@ -9,6 +9,7 @@
 #include "global.h"
 #include "ast.h"
 #include "symtab.h"
+#include "typecheck.h"
 
 extern int yylineno;
 extern char *yytext;
@@ -22,6 +23,23 @@ int yylex(void);
 void yyerror(const char *s);
 
 void print_ident(const char *kind, char *name);
+
+struct Type *type_int(void);
+struct Type *type_char(void);
+struct Type *type_float(void);
+struct Type *type_void(void);
+
+/* helper that maps the TYPE token string to a Type*. */
+static struct Type *type_from_name(const char *name) {
+    if (!name) return NULL;
+    if (strcmp(name, "int") == 0) return type_int();
+    if (strcmp(name, "char") == 0) return type_char();
+    if (strcmp(name, "float") == 0) return type_float();
+    if (strcmp(name, "void") == 0) return type_void();
+    return NULL;
+}
+
+struct Type *curr_type;
 
 %}
 
@@ -73,7 +91,7 @@ void print_ident(const char *kind, char *name);
 
 %token <boolval>    BOOL    416
 
-%token TYPE                 301
+%token <ident>      TYPE    301
 %token <charval>    CHAR    302
 %token <intval>     INT     303
 %token <floatval>   FLOAT   304
@@ -85,7 +103,9 @@ void print_ident(const char *kind, char *name);
 %token BITWISE      308
 
 
-%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_const_type type_with_struct opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr
+%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr
+
+%type <type> opt_const_type type_with_struct
 
 
 /* Precedence/associativity (list from lowest precedence to highest) */
@@ -128,51 +148,38 @@ C :  Var C          { $$ = ast_list_prepend($1, $2); }
     |               {$$ = NULL;}
   ;
 
-type_with_struct : TYPE             
+type_with_struct : TYPE             { $$ = type_from_name($1); free($1); }
                  | STRUCT IDENT 
                  ;
 
 
-opt_const_type : CONST type_with_struct
-               | type_with_struct CONST
-               | type_with_struct
+opt_const_type : CONST type_with_struct     { $$ = $2; }
+               | type_with_struct CONST     { $$ = $1; }
+               | type_with_struct           { $$ = $1; }
                ;
 
 
 Var : opt_const_type IDENT  { print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';' 
-            {
-                if($4 != NULL){
-                    $$ = ast_binop('=', ast_id($2), $4);
-                } else {
-                    $$ = ast_id($2);
-                }
-            };
 
+            {
+                $$ = ast_set_line_no(ast_decl($2, $1, $4), yylineno);
+                curr_type = $1;
+            };
 
 
 opt_ident_list : 
            | ',' IDENT  { print_ident("global variable", $2); } opt_array opt_assignment opt_ident_list
             {
-                if($4 != NULL){
-                    $$ = ast_binop('=', ast_id($2), $4);
-                } else {
-                    $$ = ast_id($2);
-                }
+                $$ = ast_set_line_no(ast_decl($2, curr_type, $4), yylineno);
             };
 
 
 
-Var_local : opt_const_type IDENT    {
-                                        print_ident("local variable", $2);
-                                    }
-            opt_array opt_assignment opt_ident_local_list ';'
-                {
-                    if($4 != NULL){
-                        $$ = ast_binop('=', ast_id($2), $4);
-                    } else {
-                        $$ = ast_id($2);
-                    }
-                };
+Var_local : opt_const_type IDENT { print_ident("local variable", $2); } opt_array opt_assignment opt_ident_local_list ';'
+            {
+                $$ = ast_set_line_no(ast_decl($2, $1, $4), yylineno);
+                curr_type = $1;
+            };
 
 
 
@@ -182,11 +189,7 @@ opt_ident_local_list :
                         } 
         opt_array opt_assignment opt_ident_local_list
             {
-                if($4 != NULL){
-                    $$ = ast_binop('=', ast_id($2), $4);
-                } else {
-                    $$ = ast_id($2);
-                }
+                $$ = ast_set_line_no(ast_decl($2, curr_type, $4), yylineno);
             };
 
 

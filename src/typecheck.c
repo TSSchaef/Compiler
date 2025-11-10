@@ -1,9 +1,25 @@
 #include "typecheck.h"
+#include "ast.h"
 #include <string.h>
 
 Type *type_int() {
     static Type int_type = { .kind = TY_INT };
     return &int_type;
+}
+
+Type *type_char(){
+    static Type char_type = { .kind = TY_CHAR };
+    return &char_type;
+}
+
+Type *type_float(){
+    static Type float_type = { .kind = TY_FLT };
+    return &float_type;
+}
+
+Type *type_void(){
+    static Type void_type = { .kind = TY_VOID };
+    return &void_type;
 }
 
 Type *type_func(Type *ret, Type **params, int param_count) {
@@ -16,8 +32,9 @@ Type *type_func(Type *ret, Type **params, int param_count) {
 }
 
 // Example error helper
-static void error(const char *msg) {
-    fprintf(stderr, "Type Error: %s\n", msg);
+static void error(const char *msg, AST *node) {
+    fprintf(stderr, "Type checking error in file %s line %d\n\t%s\n", 
+                getCurrentFileName(), ast_get_line_no(node) ,msg);
 }
 
 void type_check(AST *node){
@@ -30,7 +47,7 @@ void type_check(AST *node){
     case AST_ID: {
         Symbol *s = lookup_symbol(node->id);
         if (!s) {
-            error("undeclared id");
+            error("Undeclared identifier", node);
             node->type = NULL;
         } else {
             node->type = s->type;
@@ -43,7 +60,7 @@ void type_check(AST *node){
         if (!node->binop.left->type || !node->binop.right->type ||
             node->binop.left->type->kind != TY_INT ||
             node->binop.right->type->kind != TY_INT) {
-            error("type error in binary op");
+            error("Error in binary operation", node);
         }
         node->type = type_int();
         break;

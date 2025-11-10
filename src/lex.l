@@ -238,7 +238,11 @@ bool                        { printToken(BOOL); return BOOL; }
 
 #[ \t]*include[ \t]*\"[^\"]+\"  { getFile(); }
 
-int|float|char|void         { printToken(TYPE); return TYPE; }
+int                         { yylval.ident = strdup("int"); printToken(TYPE); return TYPE; }
+float                       { yylval.ident = strdup("float"); printToken(TYPE); return TYPE; }
+char                        { yylval.ident = strdup("char"); printToken(TYPE); return TYPE; }
+void                        { yylval.ident = strdup("void"); printToken(TYPE); return TYPE; }
+
 \'(\\[antrb\\'\"]|[^\\'])\' { printToken(CHAR); return CHAR; }
 \'(\\[antrb\\'\"]|[^\\'])[^']+ { error("Unclosed character literal"); }
 

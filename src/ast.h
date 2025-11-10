@@ -26,6 +26,8 @@ typedef struct AST {
     /* generic next pointer used to build lists (top-level, stmt lists, params) */
     struct AST *next;
 
+    int line_no; // for error reporting
+
     union {
         int intval;
         float floatval;
@@ -75,6 +77,9 @@ AST *ast_block(AST **statements, int count);
 
 AST *ast_list_prepend(AST *head, AST *node); /* prepends node to linked list head */
 AST *ast_block_from_list(AST *head); /* converts a linked list (via AST->next) into an AST_BLOCK */
+
+AST *ast_set_line_no(AST *node, int line_no);
+int ast_get_line_no(AST *node);
 
 // Utility
 void ast_free(AST *node);

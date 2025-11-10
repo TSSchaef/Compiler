@@ -3,7 +3,19 @@
 #include <string.h>
 #include <stdio.h>
 
-/* --- Constructors --- */
+AST *ast_set_line_no(AST *node, int line_no){
+    if (node) {
+        node->line_no = line_no;
+    }
+    return node;
+}
+
+int ast_get_line_no(AST *node){
+    if (node) {
+        return node->line_no;
+    }
+    return -1;
+}
 
 AST *ast_int(int v) {
     AST *n = malloc(sizeof(AST));
