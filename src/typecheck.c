@@ -278,17 +278,111 @@ static void type_check_node(AST *node) {
         }
         break;
 
-    case AST_ASSIGN:
+case AST_ASSIGN:
         type_check_node(node->assign.lhs);
         type_check_node(node->assign.rhs);
         
         if (!node->assign.lhs->type || !node->assign.rhs->type) {
             error("Invalid operands in assignment", node);
             node->type = NULL;
-        } else {
-            node->type = node->assign.lhs->type;
+            break;
         }
+        
+        // Check basic type compatibility
+        if (node->assign.lhs->type->kind == TY_VOID || 
+            node->assign.rhs->type->kind == TY_VOID) {
+            error("Cannot assign void type", node);
+            node->type = NULL;
+            break;
+        }
+        
+        // For compound assignments (+=, -=, *=, /=, %=), check arithmetic compatibility
+        if (node->assign.op != AOP_ASSIGN) {
+            // LHS must be numeric for arithmetic compound assignments
+            if (node->assign.op == AOP_ADD_ASSIGN || 
+                node->assign.op == AOP_SUB_ASSIGN ||
+                node->assign.op == AOP_MUL_ASSIGN || 
+                node->assign.op == AOP_DIV_ASSIGN) {
+                
+                // For array types, += and -= are valid (pointer arithmetic)
+                if (node->assign.lhs->type->kind == TY_ARRAY) {
+                    if (node->assign.op == AOP_MUL_ASSIGN || 
+                        node->assign.op == AOP_DIV_ASSIGN) {
+                        error("Cannot use *= or /= with array/pointer type", node);
+                        node->type = NULL;
+                        break;
+                    }
+                    // For += and -=, RHS must be integral
+                    if (!is_integral(node->assign.rhs->type)) {
+                        error("Pointer arithmetic requires integer operand", node);
+                        node->type = NULL;
+                        break;
+                    }
+                } else {
+                    // For non-array types, both sides must be numeric
+                    if (!is_numeric(node->assign.lhs->type) || 
+                        !is_numeric(node->assign.rhs->type)) {
+                        error("Compound assignment requires arithmetic types", node);
+                        node->type = NULL;
+                        break;
+                    }
+                }
+            } else if (node->assign.op == AOP_MOD_ASSIGN) {
+                // Modulo requires integral types on both sides
+                if (!is_integral(node->assign.lhs->type) || 
+                    !is_integral(node->assign.rhs->type)) {
+                    error("Modulo assignment requires integer types", node);
+                    node->type = NULL;
+                    break;
+                }
+            } else {
+                // Bitwise compound assignments require integral types
+                if (!is_integral(node->assign.lhs->type) || 
+                    !is_integral(node->assign.rhs->type)) {
+                    error("Bitwise compound assignment requires integer types", node);
+                    node->type = NULL;
+                    break;
+                }
+            }
+        } else {
+            // Simple assignment - check type compatibility
+            // Arrays/pointers can be assigned to each other
+            if (node->assign.lhs->type->kind == TY_ARRAY) {
+                // Assigning to an array - RHS should also be array/pointer
+                if (node->assign.rhs->type->kind != TY_ARRAY) {
+                    error("Type mismatch: cannot assign non-array to array", node);
+                    node->type = NULL;
+                    break;
+                }
+                // Check that element types match
+                if (!types_equal(node->assign.lhs->type->array_of, 
+                                node->assign.rhs->type->array_of)) {
+                    error("Type mismatch: array element types do not match", node);
+                    node->type = NULL;
+                    break;
+                }
+            } else if (node->assign.rhs->type->kind == TY_ARRAY) {
+                // Assigning array to non-array is not allowed
+                error("Type mismatch: cannot assign array to non-array", node);
+                node->type = NULL;
+                break;
+            } else {
+                // Both are non-arrays - allow implicit conversions between arithmetic types
+                // but don't allow completely incompatible types
+                if ((is_numeric(node->assign.lhs->type) && 
+                     !is_numeric(node->assign.rhs->type)) ||
+                    (!is_numeric(node->assign.lhs->type) && 
+                     is_numeric(node->assign.rhs->type))) {
+                    error("Type mismatch in assignment", node);
+                    node->type = NULL;
+                    break;
+                }
+            }
+        }
+        
+        node->type = node->assign.lhs->type;
         break;
+
 
     case AST_LOGICAL_OR:
     case AST_LOGICAL_AND:
@@ -404,7 +498,7 @@ static void type_check_node(AST *node) {
         break;
     }
 
-    case AST_FUNC_CALL: {
+ case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
         
         // Type check arguments
@@ -412,13 +506,119 @@ static void type_check_node(AST *node) {
             type_check_node(arg);
         }
         
-        if (node->call.callee->type && 
-            node->call.callee->type->kind == TY_FUNC) {
-            node->type = node->call.callee->type->return_type;
-        } else {
+        if (!node->call.callee->type) {
+            error("Function callee has no type", node);
+            node->type = NULL;
+            break;
+        }
+        
+        if (node->call.callee->type->kind != TY_FUNC) {
             error("Called object is not a function", node);
             node->type = NULL;
+            break;
         }
+        
+        // Check argument count
+        Type *func_type = node->call.callee->type;
+        int actual_arg_count = 0;
+        for (AST *arg = node->call.args; arg; arg = arg->next) {
+            actual_arg_count++;
+        }
+        
+        if (actual_arg_count != func_type->param_count) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Function called with %d arguments but expects %d",
+                    actual_arg_count, func_type->param_count);
+            error(buf, node);
+            node->type = NULL;
+            break;
+        }
+        
+        // Check argument types match parameter types
+        AST *arg = node->call.args;
+        for (int i = 0; i < func_type->param_count; i++) {
+            if (!arg || !arg->type) {
+                error("Argument has no type", node);
+                node->type = NULL;
+                break;
+            }
+            
+            Type *param_type = func_type->params[i];
+            Type *arg_type = arg->type;
+            
+            // Check if types are compatible
+            if (param_type->kind == TY_ARRAY) {
+                // Parameter expects an array/pointer
+                if (arg_type->kind != TY_ARRAY) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Argument %d: expected array type but got %s",
+                            i + 1, type_to_string(arg_type));
+                    error(buf, node);
+                    node->type = NULL;
+                    break;
+                }
+                // Check element types match
+                if (!types_equal(param_type->array_of, arg_type->array_of)) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Argument %d: array element types do not match (expected %s[], got %s[])",
+                            i + 1, 
+                            type_to_string(param_type->array_of),
+                            type_to_string(arg_type->array_of));
+                    error(buf, node);
+                    node->type = NULL;
+                    break;
+                }
+            } else if (arg_type->kind == TY_ARRAY) {
+                // Argument is array but parameter is not
+                char buf[256];
+                snprintf(buf, sizeof(buf),
+                        "Argument %d: cannot pass array to non-array parameter (expected %s, got %s)",
+                        i + 1,
+                        type_to_string(param_type),
+                        type_to_string(arg_type));
+                error(buf, node);
+                node->type = NULL;
+                break;
+            } else {
+                // Both are non-arrays - check basic type compatibility
+                // Allow implicit conversions between numeric types
+                bool param_numeric = is_numeric(param_type);
+                bool arg_numeric = is_numeric(arg_type);
+                
+                if (param_numeric != arg_numeric) {
+                    // One is numeric, other is not - incompatible
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Argument %d: type mismatch (expected %s, got %s)",
+                            i + 1,
+                            type_to_string(param_type),
+                            type_to_string(arg_type));
+                    error(buf, node);
+                    node->type = NULL;
+                    break;
+                }
+                
+                // For non-numeric types, they must match exactly
+                if (!param_numeric && !types_equal(param_type, arg_type)) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Argument %d: type mismatch (expected %s, got %s)",
+                            i + 1,
+                            type_to_string(param_type),
+                            type_to_string(arg_type));
+                    error(buf, node);
+                    node->type = NULL;
+                    break;
+                }
+            }
+            
+            arg = arg->next;
+        }
+        
+        node->type = func_type->return_type;
         break;
     }
 

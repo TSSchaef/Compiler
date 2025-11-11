@@ -529,7 +529,7 @@ argument_expression_list_opt : { $$ = NULL; }
 
 
 argument_expression_list : expr { $$ = $1; }
-    | argument_expression_list ',' expr { $$ = ast_set_line_no(ast_list_prepend($3, $1), yylineno); }
+    | argument_expression_list ',' expr { $$ = ast_set_line_no(ast_list_append($3, $1), yylineno); }
     ;
 
 %%

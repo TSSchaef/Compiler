@@ -180,6 +180,14 @@ AST *ast_list_prepend(AST *node, AST *head) {
     return node;
 }
 
+AST *ast_list_append(AST *node, AST *head){
+    if (!head) return node;
+    AST *p = head;
+    while (p->next) p = p->next;
+    p->next = node;
+    return head;
+}
+
 /* Convert a linked list (AST->next) into an AST_BLOCK node. The list nodes
    themselves are used as the elements of the block; the function allocates an
    array and clears the next pointers in the array elements (so they behave as

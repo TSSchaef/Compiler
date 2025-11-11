@@ -235,6 +235,7 @@ AST *ast_break(void);
 AST *ast_continue(void);
 
 AST *ast_list_prepend(AST *node, AST *head); /* prepends node to linked list head */
+AST *ast_list_append(AST *node, AST *head);
 AST *ast_block_from_list(AST *head); /* converts a linked list (via AST->next) into an AST_BLOCK */
 
 AST *ast_set_line_no(AST *node, int line_no);
