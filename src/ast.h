@@ -19,6 +19,7 @@ typedef enum {
     AST_BOOL_LITERAL,
 
     AST_ID,
+    AST_ARRAY_ACCESS,
 
     AST_BINOP,
     AST_ASSIGN,      
@@ -116,6 +117,11 @@ typedef struct AST {
         char *id;
 
         struct {
+            struct AST *array;
+            struct AST *index;
+        } array;
+
+        struct {
             BinOpKind op;
             struct AST *left;
             struct AST *right;
@@ -204,6 +210,8 @@ AST *ast_float(double v);
 AST *ast_string(char *s);
 AST *ast_char(char c);
 AST *ast_bool(bool b);
+
+AST *ast_array_access(AST *array, AST *index);
 
 AST *ast_binop(BinOpKind op, AST *l, AST *r);
 AST *ast_assign(AssignOpKind op, AST *lhs, AST *rhs);

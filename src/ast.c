@@ -65,6 +65,15 @@ AST *ast_bool(bool b){
     return n;
 }
 
+AST *ast_array_access(AST *array, AST *index){
+    AST *n = ast_alloc();
+    n->kind = AST_ARRAY_ACCESS;
+    n->line_no = array->line_no; /* inherit line number from array expr */
+    n->array.array = array;
+    n->array.index = index;
+    return n;
+}
+
 AST *ast_binop(BinOpKind op, AST *l, AST *r) {
     AST *n = ast_alloc(); /* your helper: malloc+memset */
     n->kind = AST_BINOP;

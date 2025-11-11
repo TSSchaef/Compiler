@@ -93,6 +93,10 @@ static bool is_numeric(Type *t) {
     return t && (t->kind == TY_INT || t->kind == TY_FLT);
 }
 
+static bool is_char(Type *t) {
+    return t && (t->kind == TY_CHAR);
+}
+
 // Check if type is integral
 static bool is_integral(Type *t) {
     return t && (t->kind == TY_INT || t->kind == TY_CHAR);
@@ -129,6 +133,7 @@ static bool is_expression_statement(AST *stmt) {
         case AST_LOGICAL_AND:
         case AST_TERNARY:
         case AST_ID:
+        case AST_ARRAY_ACCESS:
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:
         case AST_STRING_LITERAL:
@@ -190,6 +195,36 @@ static void type_check_node(AST *node) {
         break;
     }
 
+    case AST_ARRAY_ACCESS: {
+        type_check_node(node->array.array);
+        type_check_node(node->array.index);
+        
+        if (!node->array.array->type) {
+            error("Array expression has no type", node);
+            node->type = NULL;
+            break;
+        }
+        
+        // Check that the base is actually an array type
+        if (node->array.array->type->kind != TY_ARRAY) {
+            error("Subscripted value is not an array", node);
+            node->type = NULL;
+            break;
+        }
+        
+        // Check that index is integral type
+        if (!node->array.index->type || 
+            !is_integral(node->array.index->type)) {
+            error("Array subscript is not an integer", node);
+            node->type = NULL;
+            break;
+        }
+        
+        // The type of array[index] is the element type of the array
+        node->type = node->array.array->type->array_of;
+        break;
+    }
+
     case AST_BINOP:
         type_check_node(node->binop.left);
         type_check_node(node->binop.right);
@@ -205,8 +240,16 @@ static void type_check_node(AST *node) {
             node->binop.op == OP_MUL || node->binop.op == OP_DIV) {
             if (!is_numeric(node->binop.left->type) || 
                 !is_numeric(node->binop.right->type)) {
-                error("Arithmetic operation requires numeric operands", node);
-                node->type = NULL;
+                
+                if(!is_char(node->binop.left->type) || 
+                        !is_char(node->binop.right->type)) {
+                    error("Arithmetic operation requires numeric \
+                            or char operands", node);
+                    node->type = NULL;
+                } else {
+                    node->type = type_char();
+                }
+
             } else {
                 // Float if either operand is float
                 if (node->binop.left->type->kind == TY_FLT || 
@@ -231,7 +274,7 @@ static void type_check_node(AST *node) {
         }
         // Comparison operators
         else {
-            node->type = type_int(); // Comparisons return int (boolean)
+            node->type = type_char(); // Comparisons return char (boolean)
         }
         break;
 
@@ -251,7 +294,7 @@ static void type_check_node(AST *node) {
     case AST_LOGICAL_AND:
         type_check_node(node->logical.left);
         type_check_node(node->logical.right);
-        node->type = type_int(); // Logical operators return int (boolean)
+        node->type = type_char(); // Logical operators return char (boolean)
         break;
 
     case AST_TERNARY:

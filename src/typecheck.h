@@ -28,6 +28,9 @@ Type *type_char();
 Type *type_float();
 Type *type_void();
 
+
+Type *type_array(Type *elem_type);
+
 Type *type_func(Type *ret, Type **params, int param_count);
 
 void type_check(AST *root);

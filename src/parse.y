@@ -103,10 +103,10 @@ struct Type *curr_type;
 %token BITWISE      308
 
 
-%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr INCRDEC_PREFIX
+%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_assignment opt_ident_list opt_ident_local_list opt_param_list opt_param_list_tail opt_fun_body opt_expr INCRDEC_PREFIX
 
 %type <type> opt_const_type type_with_struct
-
+%type <boolval> opt_array opt_empty_array
 
 /* Precedence/associativity (list from lowest precedence to highest) */
 %left ','
@@ -162,23 +162,40 @@ opt_const_type : CONST type_with_struct     { $$ = $2; }
 Var : opt_const_type IDENT  { print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';' 
 
             {
-                $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
-                curr_type = $1;
+                if($4){
+                    $$ = ast_set_line_no(ast_decl($2, type_array($1), $5),
+                                                    yylineno);
+                    curr_type = $1;
+                } else {
+                    $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
+                    curr_type = $1;
+                }
             };
 
 
 opt_ident_list :  {$$ = NULL; }
            | ',' IDENT  { print_ident("global variable", $2); } opt_array opt_assignment opt_ident_list
             {
-                $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                if($4){
+                    $$ = ast_set_line_no(ast_decl($2, type_array(curr_type)
+                                                    , $5), yylineno);
+                } else {
+                    $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                }
             };
 
 
 
 Var_local : opt_const_type IDENT { print_ident("local variable", $2); } opt_array opt_assignment opt_ident_local_list ';'
             {
-                $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
-                curr_type = $1;
+                if($4){
+                    $$ = ast_set_line_no(ast_decl($2, type_array($1), $5),
+                                                    yylineno);
+                    curr_type = $1;
+                } else {
+                    $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
+                    curr_type = $1;
+                }
             };
 
 
@@ -189,7 +206,12 @@ opt_ident_local_list :  {$$ = NULL; }
                         } 
         opt_array opt_assignment opt_ident_local_list
             {
-                $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                if($4){
+                    $$ = ast_set_line_no(ast_decl($2, type_array(curr_type)
+                                                    , $5), yylineno);
+                } else {
+                    $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                }
             };
 
 
@@ -211,8 +233,9 @@ opt_member_list :
            | ',' IDENT {print_ident("member", $2);} opt_array opt_member_list;
            ;
 
-opt_array :
-          | '[' INT ']' 
+
+opt_array : { $$ = false; }
+          | '[' INT ']'  { $$ = true; }
           ;
 
 
@@ -231,20 +254,33 @@ Fun_dec : opt_const_type IDENT {print_ident("function", $2);} '(' opt_param_list
 Fun_proto : Fun_dec ';' { $$ = $1; }
           ;
 
-opt_empty_array :
-          | '[' ']' 
-          ;
+opt_empty_array :   { $$ = false; }
+        | '[' ']'  { $$ = true; }
+        ;
 
 
 opt_param_list : {$$ = NULL;}
                 | opt_const_type IDENT {print_ident("parameter", $2);} opt_empty_array opt_param_list_tail
-                {$$ = ast_set_line_no(ast_list_prepend(ast_decl($2, $1, NULL), $5), yylineno);}
-               ;
+            {
+                if($4){
+                    $$ = ast_set_line_no(ast_list_prepend(ast_decl($2, 
+                                    type_array($1), NULL), $5), yylineno);
+                } else {
+                    $$ = ast_set_line_no(ast_list_prepend(ast_decl($2, $1, 
+                                            NULL), $5), yylineno);
+                }
+            };
 
 opt_param_list_tail : {$$ = NULL;}
                      | ',' opt_const_type IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
-                    {$$ = ast_set_line_no(ast_list_prepend(ast_decl($3, $2, NULL), $6), yylineno);}
-                    ;
+            {
+                if($5){
+                    $$ = ast_set_line_no(ast_list_prepend(ast_decl($3, 
+                                    type_array($2), NULL), $6), yylineno);
+                } else
+                    $$ = ast_set_line_no(ast_list_prepend(ast_decl($3, $2, 
+                                            NULL), $6), yylineno);
+            };
 
 
 Fun_def : Fun_dec '{' opt_fun_body '}'  { $1->func.body = ast_block_from_list($3); $$ = $1; }
@@ -464,10 +500,21 @@ primary
     ;
 
 
-lvalue : IDENT                      { $$ = ast_set_line_no(ast_id($1), yylineno); }
-    | IDENT '[' expr ']'            { $$ = ast_set_line_no(ast_id($1), yylineno); }
-    | lvalue '.' IDENT              { $$ = ast_set_line_no(ast_id($3), yylineno); }
-    | lvalue '.' IDENT '[' expr ']' { $$ = ast_set_line_no(ast_id($3), yylineno); }
+lvalue : IDENT                      
+        { $$ = ast_set_line_no(ast_id($1), yylineno); }
+
+    | IDENT '[' expr ']'            
+        { 
+            $$ = ast_array_access(ast_set_line_no(ast_id($1), yylineno), $3);
+        }
+
+    | lvalue '.' IDENT              
+        { $$ = ast_set_line_no(ast_id($3), yylineno); }
+
+    | lvalue '.' IDENT '[' expr ']' 
+        { 
+            $$ = ast_array_access(ast_set_line_no(ast_id($3), yylineno), $5);
+        }
     ;
 
 
