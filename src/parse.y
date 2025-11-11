@@ -103,7 +103,7 @@ struct Type *curr_type;
 %token BITWISE      308
 
 
-%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr
+%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_array opt_assignment opt_ident_list opt_ident_local_list opt_empty_array opt_param_list opt_param_list_tail opt_fun_body opt_expr INCRDEC_PREFIX
 
 %type <type> opt_const_type type_with_struct
 
@@ -162,34 +162,34 @@ opt_const_type : CONST type_with_struct     { $$ = $2; }
 Var : opt_const_type IDENT  { print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';' 
 
             {
-                $$ = ast_set_line_no(ast_decl($2, $1, $4), yylineno);
+                $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
                 curr_type = $1;
             };
 
 
-opt_ident_list : 
+opt_ident_list :  {$$ = NULL; }
            | ',' IDENT  { print_ident("global variable", $2); } opt_array opt_assignment opt_ident_list
             {
-                $$ = ast_set_line_no(ast_decl($2, curr_type, $4), yylineno);
+                $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
             };
 
 
 
 Var_local : opt_const_type IDENT { print_ident("local variable", $2); } opt_array opt_assignment opt_ident_local_list ';'
             {
-                $$ = ast_set_line_no(ast_decl($2, $1, $4), yylineno);
+                $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
                 curr_type = $1;
             };
 
 
 
-opt_ident_local_list : 
+opt_ident_local_list :  {$$ = NULL; }
            | ',' IDENT  {
                             print_ident("local variable", $2);
                         } 
         opt_array opt_assignment opt_ident_local_list
             {
-                $$ = ast_set_line_no(ast_decl($2, curr_type, $4), yylineno);
+                $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
             };
 
 
@@ -225,211 +225,264 @@ opt_assignment :            { $$ = NULL; }
 
 
 Fun_dec : opt_const_type IDENT {print_ident("function", $2);} '(' opt_param_list ')'    {
-            //ast_func($2, $4, AST *body);
+            $$ = ast_set_line_no(ast_func($2, $1, $5, NULL), yylineno);
          };
 
-Fun_proto : Fun_dec ';' 
+Fun_proto : Fun_dec ';' { $$ = $1; }
           ;
 
 opt_empty_array :
           | '[' ']' 
           ;
 
-opt_param_list :
+
+opt_param_list : {$$ = NULL;}
                 | opt_const_type IDENT {print_ident("parameter", $2);} opt_empty_array opt_param_list_tail
+                {$$ = ast_set_line_no(ast_list_prepend(ast_decl($2, $1, NULL), $5), yylineno);}
                ;
 
-opt_param_list_tail :
+opt_param_list_tail : {$$ = NULL;}
                      | ',' opt_const_type IDENT {print_ident("parameter", $3);} opt_empty_array opt_param_list_tail
+                    {$$ = ast_set_line_no(ast_list_prepend(ast_decl($3, $2, NULL), $6), yylineno);}
                     ;
 
 
-Fun_def : Fun_dec '{' opt_fun_body '}' 
+Fun_def : Fun_dec '{' opt_fun_body '}'  { $1->func.body = ast_block_from_list($3); $$ = $1; }
         ;
 
 
 
-opt_fun_body :
-             | Var_local opt_fun_body
-             | Struct_local_def opt_fun_body
-             | Stat opt_fun_body
-             ;
+opt_fun_body :                                 { $$ = NULL; }
+            | Var_local opt_fun_body           { $$ = ast_list_prepend($1, $2); }
+            | Struct_local_def opt_fun_body    { $$ = ast_list_prepend($1, $2); }
+            | Stat opt_fun_body                { $$ = ast_list_prepend($1, $2); }
+            ;
 
 
 
-Stat_block : '{' Stat_block_body '}'
+Stat_block : '{' Stat_block_body '}' { $$ = ast_block_from_list($2); }
            ;
 
 
-Stat_block_body :
-                | Stat Stat_block_body
+Stat_block_body : {$$ = NULL; }
+                | Stat Stat_block_body  { $$ = ast_list_prepend($1, $2); }
                 ;
 
 
-Stat : matched_stmt
-     | unmatched_stmt
+Stat : matched_stmt     { $$ = $1; }
+     | unmatched_stmt   { $$ = $1; }
      ;
 
 
-unmatched_stmt : IF '(' expr ')' Stat
+unmatched_stmt : IF '(' expr ')' Stat       { $$ = ast_set_line_no(ast_if($3, $5, NULL), yylineno); }
                | IF '(' expr ')' matched_stmt ELSE unmatched_stmt
+                    { $$ = ast_set_line_no(ast_if($3, $5, $7), yylineno); }
                ;
 
 
-matched_stmt : Stat_block
-             | ';'
-             | expr ';'
-             | BREAK ';'
-             | CONTINUE ';'
-             | RETURN opt_expr ';' 
+matched_stmt : Stat_block   { $$ = $1; }
+             | ';'          { $$ = NULL; }
+             | expr ';'     { $$ = $1; }
+             | BREAK ';'    { $$ = ast_set_line_no(ast_break(), yylineno); }
+             | CONTINUE ';' { $$ = ast_set_line_no(ast_continue(), yylineno); }
+             | RETURN opt_expr ';' { $$ = ast_set_line_no(ast_return($2), yylineno); }
+
              | FOR '(' opt_expr ';' opt_expr ';' opt_expr ')' matched_stmt
+                    { $$ = ast_set_line_no(ast_for($3, $5, $7, $9), yylineno); }
+
              | WHILE '(' expr ')' matched_stmt
+                    { $$ = ast_set_line_no(ast_while($3, $5), yylineno); }
+
              | DO matched_stmt WHILE '(' expr ')' ';'
+                    { $$ = ast_set_line_no(ast_do_while($2, $5), yylineno); }
+
              | IF '(' expr ')' matched_stmt ELSE matched_stmt
+                    { $$ = ast_set_line_no(ast_if($3, $5, $7), yylineno); }
              ;
 
 
-opt_expr :
-         | expr
+opt_expr : { $$ = NULL; }
+         | expr { $$ = $1; }
          ;
 
 
-expr : assignment_expression
+expr : assignment_expression { $$ = $1; }
      ;
 
 
 
 //Assignment is right associative
-assignment_expression : conditional_expression
-    | lvalue '=' assignment_expression
+assignment_expression : conditional_expression  { $$ = $1; }
+    | lvalue '=' assignment_expression          
+            { $$ = ast_set_line_no(ast_assign(AOP_ASSIGN, $1, $3), yylineno); }
+
     | lvalue PLUS_EQUAL assignment_expression
+            { $$ = ast_set_line_no(ast_assign(AOP_ADD_ASSIGN, $1, $3), yylineno); }
+
     | lvalue MINUS_EQUAL assignment_expression
+            { $$ = ast_set_line_no(ast_assign(AOP_SUB_ASSIGN, $1, $3), yylineno); }
+
     | lvalue TIMES_EQUAL assignment_expression
+            { $$ = ast_set_line_no(ast_assign(AOP_MUL_ASSIGN, $1, $3), yylineno); }
+
     | lvalue DIVIDE_EQUAL assignment_expression
+            { $$ = ast_set_line_no(ast_assign(AOP_DIV_ASSIGN, $1, $3), yylineno); }
+
     | lvalue MODULO_EQUAL assignment_expression
+            { $$ = ast_set_line_no(ast_assign(AOP_MOD_ASSIGN, $1, $3), yylineno); }
     ;
 
 
 //Right associative ternary
-conditional_expression : logical_or_expression
+conditional_expression : logical_or_expression { $$ = $1; }
     | logical_or_expression '?' expr ':' conditional_expression
+            { $$ = ast_set_line_no(ast_ternary($1, $3, $5), yylineno); }
     ;
 
 
-logical_or_expression : logical_and_expression
+logical_or_expression : logical_and_expression  { $$ = $1; }
     | logical_or_expression OR_OR logical_and_expression
+        {$$ = ast_set_line_no(ast_logical_or($1, $3), yylineno); }
     ;
 
 
-logical_and_expression : bitwise_or_expression
+logical_and_expression : bitwise_or_expression  { $$ = $1; }
     | logical_and_expression AND_AND bitwise_or_expression
+        {$$ = ast_set_line_no(ast_logical_and($1, $3), yylineno); }
     ;
 
 
-bitwise_or_expression : bitwise_xor_expression
+bitwise_or_expression : bitwise_xor_expression { $$ = $1; }
     | bitwise_or_expression '|' bitwise_xor_expression
+        {$$ = ast_set_line_no(ast_binop(OP_BIT_OR, $1, $3), yylineno); }
     ;
 
 
-bitwise_xor_expression : bitwise_and_expression
+bitwise_xor_expression : bitwise_and_expression { $$ = $1; }
     | bitwise_xor_expression '^' bitwise_and_expression
+        {$$ = ast_set_line_no(ast_binop(OP_BIT_XOR, $1, $3), yylineno); }
     ;
 
 
 bitwise_and_expression
-    : equality_expression
+    : equality_expression   { $$ = $1; }
     | bitwise_and_expression '&' equality_expression
+        {$$ = ast_set_line_no(ast_binop(OP_BIT_AND, $1, $3), yylineno); }
     ;
 
 
-equality_expression : relational_expression
+equality_expression : relational_expression { $$ = $1; }
     | equality_expression EQUALITY relational_expression
+         {$$ = ast_set_line_no(ast_binop(OP_EQ, $1, $3), yylineno); }
     | equality_expression NOT_EQUAL relational_expression
+         {$$ = ast_set_line_no(ast_binop(OP_NEQ, $1, $3), yylineno); }
     ;
 
 
-relational_expression : additive_expression
+relational_expression : additive_expression { $$ = $1; }
     | relational_expression '<' additive_expression
+            {$$ = ast_set_line_no(ast_binop(OP_LT, $1, $3), yylineno); }
     | relational_expression '>' additive_expression
+            {$$ = ast_set_line_no(ast_binop(OP_GT, $1, $3), yylineno); }
     | relational_expression LT_EQUAL additive_expression
+            {$$ = ast_set_line_no(ast_binop(OP_LE, $1, $3), yylineno); }
     | relational_expression GT_EQUAL additive_expression
+            {$$ = ast_set_line_no(ast_binop(OP_GE, $1, $3), yylineno); }
     ;
 
 
-additive_expression : multiplicative_expression
+additive_expression : multiplicative_expression { $$ = $1; }
     | additive_expression '+' multiplicative_expression
+            {$$ = ast_set_line_no(ast_binop(OP_ADD, $1, $3), yylineno); }
     | additive_expression '-' multiplicative_expression
+            {$$ = ast_set_line_no(ast_binop(OP_SUB, $1, $3), yylineno); }
     ;
 
 
-multiplicative_expression : unary_expression
+multiplicative_expression : unary_expression    { $$ = $1; }
     | multiplicative_expression '*' unary_expression
+        {$$ = ast_set_line_no(ast_binop(OP_MUL, $1, $3), yylineno); }
     | multiplicative_expression '/' unary_expression
+        {$$ = ast_set_line_no(ast_binop(OP_DIV, $1, $3), yylineno); }
     | multiplicative_expression '%' unary_expression
+        {$$ = ast_set_line_no(ast_binop(OP_MOD, $1, $3), yylineno); }
     ;
 
 
-unary_expression : INCRDEC_PREFIX
+unary_expression : INCRDEC_PREFIX   { $$ = $1; }
     | '&' unary_expression
+            {$$ = ast_set_line_no(ast_unary(UOP_ADDR, $2), yylineno); }
     | '*' unary_expression
+            {$$ = ast_set_line_no(ast_unary(UOP_DEREF, $2), yylineno); }
     | '+' unary_expression
+            {$$ = ast_set_line_no(ast_unary(UOP_PLUS, $2), yylineno); }
     | '-' unary_expression %prec UMINUS
+            {$$ = ast_set_line_no(ast_unary(UOP_NEG, $2), yylineno); }
     | '!' unary_expression
+            {$$ = ast_set_line_no(ast_unary(UOP_LOGICAL_NOT, $2), yylineno); }
     | '~' unary_expression
+            {$$ = ast_set_line_no(ast_unary(UOP_BITWISE_NOT, $2), yylineno); }
     | '(' opt_const_type ')' unary_expression    // casting: (TYPE) expr  
-    | postfix_expression
+            {$$ = ast_set_line_no(ast_cast($2, $4), yylineno); }
+
+    | postfix_expression    { $$ = $1; }
     ;
 
 
 /* helper nonterminal for prefix ++/-- form */
 INCRDEC_PREFIX
-    : PLUS_PLUS lvalue
+    : PLUS_PLUS lvalue      
+        { $$ = ast_set_line_no(ast_unary(UOP_PRE_INC, $2), yylineno); }
     | MINUS_MINUS lvalue
+        { $$ = ast_set_line_no(ast_unary(UOP_PRE_DEC, $2), yylineno); }
     ;
 
 
 /* postfix_expression covers primary and function-call form IDENT(expr-list) and lvalue-postfix inc/dec */
 postfix_expression
-    : primary                      
+    : primary           { $$ = $1; }
     | primary '(' argument_expression_list_opt ')'   
+        { $$ = ast_set_line_no(ast_func_call($1, $3), yylineno); }
     | lvalue_postfix PLUS_PLUS
+        { $$ = ast_set_line_no(ast_unary(UOP_POST_INC, $1), yylineno); }
     | lvalue_postfix MINUS_MINUS
+        { $$ = ast_set_line_no(ast_unary(UOP_POST_DEC, $1), yylineno); }
     ;
 
 
 primary
-    : INT           { $$ = ast_int($1); }
-    | FLOAT         { $$ = ast_float($1); }
-    | STRING        { $$ = ast_string($1); }
-    | CHAR          { $$ = ast_char($1); }
-    | HEX           { $$ = ast_int($1); }
-    | BOOL          { $$ = ast_bool($1); }
-    | TRUE          { $$ = ast_bool(true); }
-    | FALSE         { $$ = ast_bool(false); }
+    : INT           { $$ = ast_set_line_no(ast_int($1), yylineno); }
+    | FLOAT         { $$ = ast_set_line_no(ast_float($1), yylineno); }
+    | STRING        { $$ = ast_set_line_no(ast_string($1), yylineno); }
+    | CHAR          { $$ = ast_set_line_no(ast_char($1), yylineno); }
+    | HEX           { $$ = ast_set_line_no(ast_int($1), yylineno); }
+    | BOOL          { $$ = ast_set_line_no(ast_bool($1), yylineno); }
+    | TRUE          { $$ = ast_set_line_no(ast_bool(true), yylineno); }
+    | FALSE         { $$ = ast_set_line_no(ast_bool(false), yylineno); }
     | '(' expr ')'  { $$ = $2; }
-    | lvalue        { /*$$ = ast_id($1);*/ }
+    | lvalue        { $$ = $1; }
     ;
 
 
-lvalue : IDENT 
-    | IDENT '[' expr ']' 
-    | lvalue '.' IDENT
-    | lvalue '.' IDENT '[' expr ']'
+lvalue : IDENT                      { $$ = ast_set_line_no(ast_id($1), yylineno); }
+    | IDENT '[' expr ']'            { $$ = ast_set_line_no(ast_id($1), yylineno); }
+    | lvalue '.' IDENT              { $$ = ast_set_line_no(ast_id($3), yylineno); }
+    | lvalue '.' IDENT '[' expr ']' { $$ = ast_set_line_no(ast_id($3), yylineno); }
     ;
 
 
 lvalue_postfix
-    : lvalue
+    : lvalue    { $$ = $1; }
     ;
 
 
-argument_expression_list_opt : 
-    | argument_expression_list
+argument_expression_list_opt : { $$ = NULL; }
+    | argument_expression_list  { $$ = $1; }
     ;
 
 
-argument_expression_list : expr
-    | argument_expression_list ',' expr
+argument_expression_list : expr { $$ = $1; }
+    | argument_expression_list ',' expr { $$ = ast_set_line_no(ast_list_prepend($3, $1), yylineno); }
     ;
 
 %%
