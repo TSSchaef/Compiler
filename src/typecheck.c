@@ -101,6 +101,46 @@ static bool is_integral(Type *t) {
 // Forward declaration
 static void type_check_node(AST *node);
 
+static bool is_expression_statement(AST *stmt) {
+    if (!stmt) return false;
+    
+    switch (stmt->kind) {
+        // These are NOT expression statements
+        case AST_DECL:
+        case AST_FUNC:
+        case AST_IF:
+        case AST_WHILE:
+        case AST_FOR:
+        case AST_DO_WHILE:
+        case AST_BLOCK:
+        case AST_RETURN:
+        case AST_BREAK:
+        case AST_CONTINUE:
+        case AST_SWITCH:
+        case AST_CASE:
+            return false;
+        
+        // These ARE expression statements
+        case AST_ASSIGN:
+        case AST_BINOP:
+        case AST_UNARY:
+        case AST_FUNC_CALL:
+        case AST_LOGICAL_OR:
+        case AST_LOGICAL_AND:
+        case AST_TERNARY:
+        case AST_ID:
+        case AST_INT_LITERAL:
+        case AST_FLOAT_LITERAL:
+        case AST_STRING_LITERAL:
+        case AST_CHAR_LITERAL:
+        case AST_BOOL_LITERAL:
+            return true;
+        
+        default:
+            return false;
+    }
+}
+
 // Type check and write expression statement to output
 static void check_expression_statement(AST *expr) {
     if (!expr) return;
@@ -342,7 +382,13 @@ static void type_check_node(AST *node) {
     case AST_BLOCK:
         enter_scope();
         for (int i = 0; i < node->block.count; i++) {
-            type_check_node(node->block.statements[i]);
+            AST *stmt = node->block.statements[i];
+            
+            if (is_expression_statement(stmt)) {
+                check_expression_statement(stmt);
+            } else {
+                type_check_node(stmt);
+            }
         }
         exit_scope();
         node->type = type_void();
@@ -410,6 +456,7 @@ void type_check(AST *node) {
     type_check_node(node);
 }
 
+
 // Type check a program (top-level statements)
 void type_check_program(AST *root) {
     if (!root) return;
@@ -421,11 +468,7 @@ void type_check_program(AST *root) {
             
             // Check if this is an expression statement (followed by semicolon)
             // For expression statements, output the type
-            if (stmt && stmt->kind != AST_DECL && stmt->kind != AST_FUNC &&
-                stmt->kind != AST_IF && stmt->kind != AST_WHILE && 
-                stmt->kind != AST_FOR && stmt->kind != AST_DO_WHILE &&
-                stmt->kind != AST_BLOCK && stmt->kind != AST_RETURN &&
-                stmt->kind != AST_BREAK && stmt->kind != AST_CONTINUE) {
+            if (is_expression_statement(stmt)) {
                 check_expression_statement(stmt);
             } else {
                 type_check_node(stmt);
