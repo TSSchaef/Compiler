@@ -1,4 +1,4 @@
-
+int a, b, c;
 float A;
 
 int f(int A[], int n)

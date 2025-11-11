@@ -159,43 +159,47 @@ opt_const_type : CONST type_with_struct     { $$ = $2; }
                ;
 
 
-Var : opt_const_type IDENT  { print_ident("global variable", $2);} opt_array opt_assignment opt_ident_list ';' 
+Var : opt_const_type IDENT  { print_ident("global variable", $2); curr_type = $1;} opt_array opt_assignment opt_ident_list ';' 
 
             {
+                AST *decl;
                 if($4){
-                    $$ = ast_set_line_no(ast_decl($2, type_array($1), $5),
+                    decl = ast_set_line_no(ast_decl($2, type_array($1), $5),
                                                     yylineno);
-                    curr_type = $1;
                 } else {
-                    $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
-                    curr_type = $1;
+                    decl = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
                 }
+
+                $$ = ast_list_prepend(decl, $6);
+
             };
 
 
 opt_ident_list :  {$$ = NULL; }
            | ',' IDENT  { print_ident("global variable", $2); } opt_array opt_assignment opt_ident_list
             {
+                AST *decl;
                 if($4){
-                    $$ = ast_set_line_no(ast_decl($2, type_array(curr_type)
+                    decl = ast_set_line_no(ast_decl($2, type_array(curr_type)
                                                     , $5), yylineno);
                 } else {
-                    $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                    decl = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
                 }
+                $$ = ast_list_prepend(decl, $6);
             };
 
 
 
-Var_local : opt_const_type IDENT { print_ident("local variable", $2); } opt_array opt_assignment opt_ident_local_list ';'
+Var_local : opt_const_type IDENT { print_ident("local variable", $2); curr_type = $1; } opt_array opt_assignment opt_ident_local_list ';'
             {
+                AST *decl;
                 if($4){
-                    $$ = ast_set_line_no(ast_decl($2, type_array($1), $5),
+                    decl = ast_set_line_no(ast_decl($2, type_array($1), $5),
                                                     yylineno);
-                    curr_type = $1;
                 } else {
-                    $$ = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
-                    curr_type = $1;
+                    decl = ast_set_line_no(ast_decl($2, $1, $5), yylineno);
                 }
+                $$ = ast_list_prepend(decl, $6);
             };
 
 
@@ -206,12 +210,14 @@ opt_ident_local_list :  {$$ = NULL; }
                         } 
         opt_array opt_assignment opt_ident_local_list
             {
+                AST *decl;
                 if($4){
-                    $$ = ast_set_line_no(ast_decl($2, type_array(curr_type)
+                    decl = ast_set_line_no(ast_decl($2, type_array(curr_type)
                                                     , $5), yylineno);
                 } else {
-                    $$ = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
+                    decl = ast_set_line_no(ast_decl($2, curr_type, $5), yylineno);
                 }
+                $$ = ast_list_prepend(decl, $6);    
             };
 
 

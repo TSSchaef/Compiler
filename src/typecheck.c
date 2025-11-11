@@ -163,6 +163,8 @@ static void check_expression_statement(AST *expr) {
 static void type_check_node(AST *node) {
     if (!node) return;
 
+    //fprintf(stderr, "Type checking node kind=%d, line=%d\n", node->kind, node->line_no);
+
     switch (node->kind) {
     case AST_INT_LITERAL:
         node->type = type_int();
@@ -455,11 +457,19 @@ case AST_ASSIGN:
         break;
 
     case AST_DECL:
+        //fprintf(stderr, "  DECL name=%s, next=%p\n", node->decl.name, (void*)node->next);
+
         if (node->decl.init) {
             type_check_node(node->decl.init);
         }
-        add_symbol(node->decl.name, node->decl.decl_type);
+        if(!add_symbol(node->decl.name, node->decl.decl_type)){
+            error("Redeclaration of variable", node);
+        }
+        if(node->decl.decl_type->kind == TY_VOID){
+            error("Variable cannot be of type void", node);
+        }
         node->type = node->decl.decl_type;
+        // DON'T process node->next here - the block will handle it
         break;
 
     case AST_FUNC: {
@@ -467,10 +477,15 @@ case AST_ASSIGN:
         AST *param = node->func.params;
         int param_count = 0;
         Type **param_types = NULL;
-        
+
+        //fprintf(stderr, "Processing function: %s\n", node->func.name);
+        //fprintf(stderr, "Parameters:\n");
+
         // Count parameters
         for (AST *p = param; p; p = p->next) {
             param_count++;
+            //fprintf(stderr, "  Param: %s (next=%p)\n", p->decl.name, (void*)p->next);
+
         }
         
         if (param_count > 0) {
@@ -482,13 +497,22 @@ case AST_ASSIGN:
         }
         
         Type *ft = type_func(node->func.return_type, param_types, param_count);
-        add_symbol(node->func.name, ft);
         
+        if(!add_symbol(node->func.name, ft)){
+            error("Redeclaration of variable", node);
+        }
+
         enter_scope();
         
         // Add parameters to scope
         for (AST *p = param; p; p = p->next) {
-            add_symbol(p->decl.name, p->decl.decl_type);
+            if(!add_symbol(p->decl.name, p->decl.decl_type)){
+                error("Redeclaration of variable", node);
+            }
+
+            if(p->decl.decl_type->kind == TY_VOID){
+                error("Function parameter cannot be of type void", node);
+            }
         }
         
         type_check_node(node->func.body);
@@ -689,6 +713,7 @@ case AST_ASSIGN:
         break;
 
     default:
+        error("Unrecognized AST node kind in type checker", node);
         node->type = NULL;
         break;
     }

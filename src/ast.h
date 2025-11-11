@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "symtab.h"
+
 extern FILE *outputFile;
 
 extern char *getOutputFileName();
@@ -94,8 +96,6 @@ typedef enum {
     AOP_SHL_ASSIGN,  /* <<= */
     AOP_SHR_ASSIGN   /* >>= */
 } AssignOpKind;
-
-struct Type; // forward declare for type checking and symbol table
 
 typedef struct AST {
     ASTKind kind;
@@ -222,6 +222,7 @@ AST *ast_unary(UnaryOpKind op, AST *operand);
 AST *ast_cast(struct Type *target, AST *operand);
 
 AST *ast_decl(const char *name, struct Type *decl_type, AST *init);
+
 AST *ast_func(const char *name, struct Type *return_type, AST *params, AST *body);
 AST *ast_func_call(AST *callee, AST *args); /* args is linked list via AST->next; may be NULL */
 AST *ast_block(AST **statements, int count);

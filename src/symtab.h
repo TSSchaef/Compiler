@@ -1,9 +1,16 @@
+
 #ifndef SYMTAB_H
 #define SYMTAB_H
 
 #include <stdbool.h>
 
-typedef struct Type Type; // forward declare for type system
+typedef struct Type {
+    enum { TY_INT, TY_CHAR, TY_FLT, TY_VOID, TY_ARRAY, TY_FUNC } kind;
+    struct Type *return_type;
+    struct Type *array_of;
+    struct Type **params;
+    int param_count;
+} Type;
 
 typedef struct Symbol {
     char *name;
@@ -12,7 +19,8 @@ typedef struct Symbol {
 } Symbol;
 
 typedef struct Scope {
-    Symbol **table;
+    Symbol **var_table;      // Separate table for variables
+    Symbol **func_table;     // Separate table for functions
     int bucket_count;
     struct Scope *parent;
 } Scope;

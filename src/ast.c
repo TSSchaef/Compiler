@@ -175,8 +175,26 @@ AST *ast_block(AST **statements, int count) {
 
 
 AST *ast_list_prepend(AST *node, AST *head) {
+    if (!head) return node;
     if (!node) return head;
-    node->next = head;
+
+    // Find the last node in the list being prepended
+    AST *last = node;
+    int count = 0;
+
+    while (last->next) {
+        last = last->next;
+
+        count++;
+        if (count > 10000) {  // Safety check
+            fprintf(stderr, "ERROR: Infinite loop detected in ast_list_prepend!\n");
+            fprintf(stderr, "Node kind: %d, at line %d\n", node->kind, node->line_no);
+            exit(1);
+        }
+    }
+
+    // Connect the last node of the prepended list to the head
+    last->next = head;
     return node;
 }
 
@@ -381,6 +399,16 @@ static void ast_print_helper(AST *node, int indent) {
             printf("\n");
             break;
 
+        case AST_ARRAY_ACCESS:
+            printf("ARRAY_ACCESS\n");
+            ast_print_indent(indent + 2);
+            printf("array:\n");
+            ast_print_helper(node->array.array, indent + 4);
+            ast_print_indent(indent + 2);
+            printf("index:\n");
+            ast_print_helper(node->array.index, indent + 4);
+            break;
+
         case AST_BINOP:
             printf("BINOP: %s\n", binop_to_string(node->binop.op));
             ast_print_helper(node->binop.left, indent + 2);
@@ -430,23 +458,7 @@ static void ast_print_helper(AST *node, int indent) {
         case AST_DECL:
             printf("DECL: ");
             if (node->decl.name) {
-                // Safely validate and print the string
-                bool valid = true;
-                for (int i = 0; node->decl.name[i] != '\0' && i < 1000; i++) {
-                    if (node->decl.name[i] < 32 || node->decl.name[i] > 126) {
-                        if (node->decl.name[i] != '\0') {
-                            valid = false;
-                            break;
-                        }
-                    }
-                }
-                if (valid) {
-                    printf("%s", node->decl.name);
-                } else {
-                    printf("(corrupted: %p)", (void*)node->decl.name);
-                }
-            } else {
-                printf("(null)");
+                printf("%s", node->decl.name);
             }
             printf("\n");
             if (node->decl.init) {
@@ -625,6 +637,12 @@ void ast_free(AST *node) {
 
         case AST_ID:
             free(node->id);
+            free(node);
+            break;
+
+        case AST_ARRAY_ACCESS:
+            ast_free(node->array.array);
+            ast_free(node->array.index);
             free(node);
             break;
 

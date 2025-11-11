@@ -16,7 +16,8 @@ static unsigned hash(const char *s, int mod) {
 static Scope *new_scope(Scope *parent) {
     Scope *s = malloc(sizeof(Scope));
     s->bucket_count = DEFAULT_BUCKETS;
-    s->table = calloc(s->bucket_count, sizeof(Symbol *));
+    s->var_table = calloc(s->bucket_count, sizeof(Symbol *));
+    s->func_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->parent = parent;
     return s;
 }
@@ -32,9 +33,20 @@ void enter_scope() {
 void exit_scope() {
     if (!current_scope) return;
 
-    // free symbols in this scope
+    // free symbols in variable table
     for (int i = 0; i < current_scope->bucket_count; i++) {
-        Symbol *sym = current_scope->table[i];
+        Symbol *sym = current_scope->var_table[i];
+        while (sym) {
+            Symbol *next = sym->next;
+            free(sym->name);
+            free(sym);
+            sym = next;
+        }
+    }
+
+    // free symbols in function table
+    for (int i = 0; i < current_scope->bucket_count; i++) {
+        Symbol *sym = current_scope->func_table[i];
         while (sym) {
             Symbol *next = sym->next;
             free(sym->name);
@@ -44,7 +56,8 @@ void exit_scope() {
     }
 
     Scope *parent = current_scope->parent;
-    free(current_scope->table);
+    free(current_scope->var_table);
+    free(current_scope->func_table);
     free(current_scope);
     current_scope = parent;
 }
@@ -52,40 +65,66 @@ void exit_scope() {
 bool add_symbol(const char *name, Type *type) {
     if (!current_scope) init_symtab();
 
-    // Check if already exists in current scope
-    if (lookup_symbol_current(name)) {
-        fprintf(stderr, "Error: redeclaration of '%s'\n", name);
-        return false;
+    bool is_func = (type && type->kind == TY_FUNC);
+    Symbol **table = is_func ? current_scope->func_table : current_scope->var_table;
+    
+    // Check if already exists in the appropriate table
+    unsigned idx = hash(name, current_scope->bucket_count);
+    Symbol *sym = table[idx];
+    while (sym) {
+        if (strcmp(sym->name, name) == 0) {
+            return false;
+        }
+        sym = sym->next;
     }
 
-    unsigned idx = hash(name, current_scope->bucket_count);
+    // Add new symbol to appropriate table
+    Symbol *new_sym = malloc(sizeof(Symbol));
+    new_sym->name = strdup(name);
+    new_sym->type = type;
+    new_sym->next = table[idx];
 
-    Symbol *sym = malloc(sizeof(Symbol));
-    sym->name = strdup(name);
-    sym->type = type;
-    sym->next = current_scope->table[idx];
-
-    current_scope->table[idx] = sym;
+    table[idx] = new_sym;
     return true;
 }
 
 Symbol *lookup_symbol_current(const char *name) {
     if (!current_scope) return NULL;
     unsigned idx = hash(name, current_scope->bucket_count);
-    Symbol *sym = current_scope->table[idx];
+    
+    // Search variable table first
+    Symbol *sym = current_scope->var_table[idx];
     while (sym) {
         if (strcmp(sym->name, name) == 0)
             return sym;
         sym = sym->next;
     }
+    
+    // Then search function table
+    sym = current_scope->func_table[idx];
+    while (sym) {
+        if (strcmp(sym->name, name) == 0)
+            return sym;
+        sym = sym->next;
+    }
+    
     return NULL;
 }
 
 Symbol *lookup_symbol(const char *name) {
     for (Scope *s = current_scope; s; s = s->parent) {
-        // Search in scope s, not current_scope
         unsigned idx = hash(name, s->bucket_count);
-        Symbol *sym = s->table[idx];
+        
+        // Search variable table first
+        Symbol *sym = s->var_table[idx];
+        while (sym) {
+            if (strcmp(sym->name, name) == 0)
+                return sym;
+            sym = sym->next;
+        }
+        
+        // Then search function table
+        sym = s->func_table[idx];
         while (sym) {
             if (strcmp(sym->name, name) == 0)
                 return sym;
@@ -94,4 +133,3 @@ Symbol *lookup_symbol(const char *name) {
     }
     return NULL;
 }
-

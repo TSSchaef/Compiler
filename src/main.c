@@ -46,6 +46,8 @@ int main(int argc, char *argv[]){
             //ast_print(root_ast);
             type_check(root_ast);
 
+            ast_free(root_ast);
+
             break;
 
         case 5:
