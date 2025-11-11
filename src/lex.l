@@ -243,7 +243,11 @@ float                       { yylval.ident = strdup("float"); printToken(TYPE); 
 char                        { yylval.ident = strdup("char"); printToken(TYPE); return TYPE; }
 void                        { yylval.ident = strdup("void"); printToken(TYPE); return TYPE; }
 
-\'(\\[antrb\\'\"]|[^\\'])\' { printToken(CHAR); return CHAR; }
+\'(\\[antrb\\'\"]|[^\\'])\' {
+                                 printToken(CHAR); 
+                                 yylval.charval = yytext[1];
+                                 return CHAR; 
+                            }
 \'(\\[antrb\\'\"]|[^\\'])[^']+ { error("Unclosed character literal"); }
 
 [0-9]+                      { if(yyleng > MAX_INT_LEN) {
@@ -251,6 +255,7 @@ void                        { yylval.ident = strdup("void"); printToken(TYPE); r
                                 return 0;
                             }
                             printToken(INT); 
+                            yylval.intval = atoi(yytext);
                             return INT;
                             }
 
@@ -259,6 +264,7 @@ void                        { yylval.ident = strdup("void"); printToken(TYPE); r
                                     return 0;
                                 }
                                 printToken(FLOAT);
+                                yylval.floatval = atof(yytext);
                                 return FLOAT;
                                 }
 
@@ -267,6 +273,7 @@ void                        { yylval.ident = strdup("void"); printToken(TYPE); r
                                     return 0;
                                 }
                                 printToken(FLOAT);
+                                yylval.floatval = atof(yytext);
                                 return FLOAT;
                             }
 
@@ -275,6 +282,7 @@ void                        { yylval.ident = strdup("void"); printToken(TYPE); r
                                     return 0;
                                 }
                                 printToken(STRING);
+                                yylval.strval = strdup(yytext);
                                 return STRING;
                             }
 
@@ -289,7 +297,12 @@ void                        { yylval.ident = strdup("void"); printToken(TYPE); r
                                 return IDENT;
                             }
 
-0[xX][0-9abcdefABCDEF]+     { printHex(HEX); return HEX; }
+0[xX][0-9abcdefABCDEF]+     { 
+                                printHex(HEX);
+                                yylval.intval = (int)strtol(yytext, NULL, 16);
+                                return HEX;
+                            }
+
 \^=?                        { printToken(BITWISE); return BITWISE; }
 
 

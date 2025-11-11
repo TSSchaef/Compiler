@@ -451,7 +451,7 @@ postfix_expression
 
 
 primary
-    : INT           { $$ = ast_set_line_no(ast_int($1), yylineno); }
+    : INT           { $$ = ast_set_line_no(ast_int($1), yylineno);}
     | FLOAT         { $$ = ast_set_line_no(ast_float($1), yylineno); }
     | STRING        { $$ = ast_set_line_no(ast_string($1), yylineno); }
     | CHAR          { $$ = ast_set_line_no(ast_char($1), yylineno); }
