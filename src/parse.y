@@ -495,8 +495,6 @@ void print_ident(const char *kind, char *name) {
     if(mode == 3){
         fprintf(outputFile, "File %s Line %d: %s %s\n", getCurrentFileName(), yylineno, kind, name);
     }
-
-    free(name);
 }
 
 void yyerror(const char *s) {

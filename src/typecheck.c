@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static FILE *output_file = NULL;
+static const char *current_filename = NULL;
+
 // Type constructors
 Type *type_int() {
     static Type int_type = { .kind = TY_INT };
@@ -44,7 +47,7 @@ Type *type_func(Type *ret, Type **params, int param_count) {
 
 // Helper to convert type to string for output
 static const char *type_to_string(Type *t) {
-    static char buf[258];
+    static char buf[512];
     if (!t) return "unknown";
     
     switch (t->kind) {
@@ -52,7 +55,7 @@ static const char *type_to_string(Type *t) {
         case TY_CHAR: return "char";
         case TY_FLT: return "float";
         case TY_VOID: return "void";
-        case TY_ARRAY:
+        case TY_ARRAY: {
             const char *elem = type_to_string(t->array_of);
             size_t elem_len = strlen(elem);
             // Ensure we have space for elem + "[]" + null terminator
@@ -62,7 +65,9 @@ static const char *type_to_string(Type *t) {
                 strncpy(buf, "array", sizeof(buf) - 1);
                 buf[sizeof(buf) - 1] = '\0';
             }
-            return buf;        case TY_FUNC:
+            return buf;
+        }
+        case TY_FUNC:
             return "function";
         default:
             return "unknown";
@@ -72,8 +77,15 @@ static const char *type_to_string(Type *t) {
 // Error helper
 static void error(const char *msg, AST *node) {
     fprintf(stderr, "Type checking error in file %s line %d\n\t%s\n", 
-            getCurrentFileName() ? getCurrentFileName() : "unknown",
+            current_filename ? current_filename : "unknown", 
             ast_get_line_no(node), msg);
+}
+
+// Initialize type checker with output file
+void typecheck_init(const char *filename, FILE *out) {
+    current_filename = filename;
+    output_file = out;
+    init_symtab();
 }
 
 // Check if types are compatible
@@ -107,9 +119,9 @@ static void check_expression_statement(AST *expr, int line_no) {
     
     type_check_node(expr);
     
-    if (outputFile && expr->type) {
-        fprintf(outputFile, "File %s Line %d: expression has type %s\n",
-                getCurrentFileName() ? getCurrentFileName() : "unknown",
+    if (output_file && expr->type) {
+        fprintf(output_file, "File %s Line %d: expression has type %s\n",
+                current_filename ? current_filename : "unknown",
                 line_no,
                 type_to_string(expr->type));
     }
@@ -410,6 +422,47 @@ void type_check(AST *node) {
     type_check_node(node);
 }
 
+// Helper to determine if a statement is an expression statement
+static bool is_expression_statement(AST *stmt) {
+    if (!stmt) return false;
+    
+    switch (stmt->kind) {
+        // These are NOT expression statements
+        case AST_DECL:
+        case AST_FUNC:
+        case AST_IF:
+        case AST_WHILE:
+        case AST_FOR:
+        case AST_DO_WHILE:
+        case AST_BLOCK:
+        case AST_RETURN:
+        case AST_BREAK:
+        case AST_CONTINUE:
+        case AST_SWITCH:
+        case AST_CASE:
+            return false;
+        
+        // These ARE expression statements
+        case AST_ASSIGN:
+        case AST_BINOP:
+        case AST_UNARY:
+        case AST_FUNC_CALL:
+        case AST_LOGICAL_OR:
+        case AST_LOGICAL_AND:
+        case AST_TERNARY:
+        case AST_ID:
+        case AST_INT_LITERAL:
+        case AST_FLOAT_LITERAL:
+        case AST_STRING_LITERAL:
+        case AST_CHAR_LITERAL:
+        case AST_BOOL_LITERAL:
+            return true;
+        
+        default:
+            return false;
+    }
+}
+
 // Type check a program (top-level statements)
 void type_check_program(AST *root) {
     if (!root) return;
@@ -419,13 +472,8 @@ void type_check_program(AST *root) {
         for (int i = 0; i < root->block.count; i++) {
             AST *stmt = root->block.statements[i];
             
-            // Check if this is an expression statement (followed by semicolon)
-            // For expression statements, output the type
-            if (stmt && stmt->kind != AST_DECL && stmt->kind != AST_FUNC &&
-                stmt->kind != AST_IF && stmt->kind != AST_WHILE && 
-                stmt->kind != AST_FOR && stmt->kind != AST_DO_WHILE &&
-                stmt->kind != AST_BLOCK && stmt->kind != AST_RETURN &&
-                stmt->kind != AST_BREAK && stmt->kind != AST_CONTINUE) {
+            // Check if this is an expression statement
+            if (is_expression_statement(stmt)) {
                 check_expression_statement(stmt, ast_get_line_no(stmt));
             } else {
                 type_check_node(stmt);

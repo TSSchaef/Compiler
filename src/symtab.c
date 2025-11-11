@@ -83,8 +83,14 @@ Symbol *lookup_symbol_current(const char *name) {
 
 Symbol *lookup_symbol(const char *name) {
     for (Scope *s = current_scope; s; s = s->parent) {
-        Symbol *sym = lookup_symbol_current(name);
-        if (sym) return sym;
+        // Search in scope s, not current_scope
+        unsigned idx = hash(name, s->bucket_count);
+        Symbol *sym = s->table[idx];
+        while (sym) {
+            if (strcmp(sym->name, name) == 0)
+                return sym;
+            sym = sym->next;
+        }
     }
     return NULL;
 }

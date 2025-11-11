@@ -2,6 +2,14 @@
 #define AST_H
 
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+extern FILE *outputFile;
+
+extern char *getOutputFileName();
+extern char *getCurrentFileName();
 
 typedef enum {
     AST_INT_LITERAL,
@@ -96,6 +104,7 @@ typedef struct AST {
     struct AST *next;
 
     int line_no; // for error reporting
+    char *filename; // for error reporting
 
     union {
         int intval;
@@ -217,7 +226,7 @@ AST *ast_return(AST *expr);
 AST *ast_break(void);
 AST *ast_continue(void);
 
-AST *ast_list_prepend(AST *head, AST *node); /* prepends node to linked list head */
+AST *ast_list_prepend(AST *node, AST *head); /* prepends node to linked list head */
 AST *ast_block_from_list(AST *head); /* converts a linked list (via AST->next) into an AST_BLOCK */
 
 AST *ast_set_line_no(AST *node, int line_no);
