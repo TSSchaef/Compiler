@@ -1,4 +1,5 @@
 #include "typecheck.h"
+#include "global.h"
 #include "ast.h"
 #include "symtab.h"
 #include <string.h>
@@ -271,10 +272,12 @@ static void check_expression_statement(AST *expr) {
     type_check_node(expr);
     
     if (outputFile && expr->type) {
-        fprintf(outputFile, "File %s Line %d: expression has type %s\n",
-                expr->filename,
-                ast_get_line_no(expr),
-                type_to_string(expr->type));
+        if(mode == 4){
+            fprintf(outputFile, "File %s Line %d: expression has type %s\n",
+                    expr->filename,
+                    ast_get_line_no(expr),
+                    type_to_string(expr->type));
+        }
     }
 }
 
