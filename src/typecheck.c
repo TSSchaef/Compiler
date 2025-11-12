@@ -9,28 +9,64 @@ static Type *current_function_return_type = NULL;
 
 // Type constructors
 Type *type_int() {
-    static Type int_type = { .kind = TY_INT };
-    return &int_type;
+    return type_int_const(false);
+}
+
+Type *type_int_const(bool is_const) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_INT;
+    t->is_const = is_const;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    return t;
 }
 
 Type *type_char() {
-    static Type char_type = { .kind = TY_CHAR };
-    return &char_type;
+    return type_char_const(false);
+}
+
+Type *type_char_const(bool is_const) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_CHAR;
+    t->is_const = is_const;
+    return t;
 }
 
 Type *type_float() {
-    static Type float_type = { .kind = TY_FLT };
-    return &float_type;
+    return type_float_const(false);
+}
+
+Type *type_float_const(bool is_const) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_FLT;
+    t->is_const = is_const;
+    return t;
 }
 
 Type *type_void() {
-    static Type void_type = { .kind = TY_VOID };
-    return &void_type;
+    return type_void_const(false);
+}
+
+Type *type_void_const(bool is_const) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_VOID;
+    t->is_const = is_const;
+    return t;
+}
+
+Type *set_const(Type *t){
+    if(t){
+        t->is_const = true;
+    }
+    return t;
 }
 
 Type *type_array(Type *elem_type) {
     Type *t = malloc(sizeof(Type));
     t->kind = TY_ARRAY;
+    t->is_const = false;
     t->array_of = elem_type;
     return t;
 }
@@ -49,28 +85,51 @@ static const char *type_to_string(Type *t) {
     static char buf[258];
     if (!t) return "unknown";
     
+    const char *const_prefix = t->is_const ? "const " : "";
+    
     switch (t->kind) {
-        case TY_INT: return "int";
-        case TY_CHAR: return "char";
-        case TY_FLT: return "float";
-        case TY_VOID: return "void";
-        case TY_ARRAY:
-            const char *elem = type_to_string(t->array_of);
-            size_t elem_len = strlen(elem);
-            // Ensure we have space for elem + "[]" + null terminator
-            if (elem_len + 3 <= sizeof(buf)) {
-                snprintf(buf, sizeof(buf), "%s[]", elem);
-            } else {
-                strncpy(buf, "array", sizeof(buf) - 1);
-                buf[sizeof(buf) - 1] = '\0';
+        case TY_INT: 
+            snprintf(buf, sizeof(buf), "%sint", const_prefix);
+            return buf;
+        case TY_CHAR:
+            snprintf(buf, sizeof(buf), "%schar", const_prefix);
+            return buf;
+        case TY_FLT:
+            snprintf(buf, sizeof(buf), "%sfloat", const_prefix);
+            return buf;
+        case TY_VOID: 
+            return "void";
+        case TY_ARRAY: {
+            // Get the base element type string (without any const)
+            Type *elem = t->array_of;
+            if (!elem) return "[]";
+
+            // Build the string with const prefix if element is const
+            const char *elem_const = elem->is_const ? "const " : "";
+            const char *base_type;
+
+            switch (elem->kind) {
+                case TY_INT: base_type = "int"; break;
+                case TY_CHAR: base_type = "char"; break;
+                case TY_FLT: base_type = "float"; break;
+                case TY_VOID: base_type = "void"; break;
+                case TY_ARRAY:
+                              // Nested array - recursively get the type
+                              base_type = type_to_string(elem);
+                              snprintf(buf, sizeof(buf), "%s[]", base_type);
+                              return buf;
+                default: base_type = "unknown"; break;
             }
-            return buf;        case TY_FUNC:
+
+            snprintf(buf, sizeof(buf), "%s%s[]", elem_const, base_type);
+            return buf;
+        }
+        case TY_FUNC:
             return "function";
         default:
             return "unknown";
     }
 }
-
 // Error helper
 static void error(const char *msg, AST *node) {
     fprintf(stderr, "Type checking error in file %s line %d\n\t%s\n", 
@@ -180,10 +239,15 @@ static void type_check_node(AST *node) {
         node->type = type_char();
         break;
         
-    case AST_STRING_LITERAL:
-        node->type = type_array(type_char());
+    case AST_STRING_LITERAL: {
+        Type *char_type = malloc(sizeof(Type));
+        char_type->kind = TY_CHAR;
+        char_type->is_const = true;  // String literals are const
+        node->type = type_array(char_type);
         break;
-        
+    }
+                              
+
     case AST_BOOL_LITERAL:
         node->type = type_int(); // Treat bool as int
         break;
@@ -200,34 +264,31 @@ static void type_check_node(AST *node) {
     }
 
     case AST_ARRAY_ACCESS: {
-        type_check_node(node->array.array);
-        type_check_node(node->array.index);
-        
-        if (!node->array.array->type) {
-            error("Array expression has no type", node);
-            node->type = NULL;
-            break;
-        }
-        
-        // Check that the base is actually an array type
-        if (node->array.array->type->kind != TY_ARRAY) {
-            error("Subscripted value is not an array", node);
-            node->type = NULL;
-            break;
-        }
-        
-        // Check that index is integral type
-        if (!node->array.index->type || 
-            !is_integral(node->array.index->type)) {
-            error("Array subscript is not an integer", node);
-            node->type = NULL;
-            break;
-        }
-        
-        // The type of array[index] is the element type of the array
-        node->type = node->array.array->type->array_of;
-        break;
-    }
+       type_check_node(node->array.array);
+       type_check_node(node->array.index);
+
+       if (!node->array.array->type) {
+           error("Array expression has no type", node);
+           node->type = NULL;
+           break;
+       }
+
+       if (node->array.array->type->kind != TY_ARRAY) {
+           error("Tried to access a variable that isn't an array", node);
+           node->type = NULL;
+           break;
+       }
+
+       if (!node->array.index->type || !is_integral(node->array.index->type)) {
+           error("Array subscript is not an integer", node);
+           node->type = NULL;
+           break;
+       }
+
+       // The type of array[index] is the element type, preserving const
+       node->type = node->array.array->type->array_of;
+       break;
+   }
 
     case AST_BINOP:
         type_check_node(node->binop.left);
@@ -280,6 +341,12 @@ static void type_check_node(AST *node) {
         else {
             node->type = type_char(); // Comparisons return char (boolean)
         }
+
+        if (node->type) {
+            // All binops discard const
+            node->type->is_const = false;
+        }
+
         break;
 
 case AST_ASSIGN:
@@ -296,6 +363,13 @@ case AST_ASSIGN:
         if (node->assign.lhs->type->kind == TY_VOID || 
             node->assign.rhs->type->kind == TY_VOID) {
             error("Cannot assign void type", node);
+            node->type = NULL;
+            break;
+        }
+
+        // Check if trying to assign to const
+        if (node->assign.lhs->type->is_const) {
+            error("Cannot assign to const variable", node);
             node->type = NULL;
             break;
         }
@@ -430,10 +504,16 @@ case AST_ASSIGN:
                     error("Unary +/- requires numeric or char operand", node);
                     node->type = NULL;
                 }
+                if (node->type) {
+                    node->type->is_const = false;
+                }
                 break;
                 
             case UOP_LOGICAL_NOT:
                 node->type = type_char();
+                if (node->type) {
+                    node->type->is_const = false;
+                }
                 break;
                 
             case UOP_BITWISE_NOT:
@@ -445,6 +525,9 @@ case AST_ASSIGN:
                     error("Bitwise NOT requires integral operand", node);
                     node->type = NULL;
                 }
+                if (node->type) {
+                    node->type->is_const = false;
+                }
                 break;
                 
             case UOP_PRE_INC:
@@ -452,6 +535,11 @@ case AST_ASSIGN:
             case UOP_POST_INC:
             case UOP_POST_DEC:
                 if (node->unary.operand->type) {
+                    if (node->unary.operand->type->is_const) {
+                        error("Cannot increment/decrement const variable", node);
+                        node->type = NULL;
+                        break;
+                    }
                     node->type = node->unary.operand->type;
                 } else {
                     node->type = NULL;
@@ -460,10 +548,16 @@ case AST_ASSIGN:
                 
             case UOP_CAST:
                 node->type = node->unary.cast_type;
+                if (node->type) {
+                    node->type->is_const = false;
+                }
                 break;
                 
             default:
                 node->type = node->unary.operand->type;
+                if (node->type) {
+                    node->type->is_const = false;
+                }
                 break;
         }
         break;

@@ -153,8 +153,8 @@ type_with_struct : TYPE             { $$ = type_from_name($1); free($1); }
                  ;
 
 
-opt_const_type : CONST type_with_struct     { $$ = $2; }
-               | type_with_struct CONST     { $$ = $1; }
+opt_const_type : CONST type_with_struct     { $$ = set_const($2); }
+               | type_with_struct CONST     { $$ = set_const($1); }
                | type_with_struct           { $$ = $1; }
                ;
 

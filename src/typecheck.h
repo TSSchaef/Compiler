@@ -18,6 +18,12 @@ Type *type_char();
 Type *type_float();
 Type *type_void();
 
+Type *type_int_const(bool is_const) ;
+Type *type_char_const(bool is_const) ;
+Type *type_float_const(bool is_const) ;
+Type *type_void_const(bool is_const) ;
+
+Type *set_const(Type *t);
 
 Type *type_array(Type *elem_type);
 

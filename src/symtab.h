@@ -6,6 +6,7 @@
 
 typedef struct Type {
     enum { TY_INT, TY_CHAR, TY_FLT, TY_VOID, TY_ARRAY, TY_FUNC } kind;
+    bool is_const;
     struct Type *return_type;
     struct Type *array_of;
     struct Type **params;
