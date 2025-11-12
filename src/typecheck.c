@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static Type *current_function_return_type = NULL;
+
 // Type constructors
 Type *type_int() {
     static Type int_type = { .kind = TY_INT };
@@ -473,54 +475,57 @@ case AST_ASSIGN:
         break;
 
     case AST_FUNC: {
-        // Build function type from parameters
-        AST *param = node->func.params;
-        int param_count = 0;
-        Type **param_types = NULL;
+                       // Build function type from parameters
+                       AST *param = node->func.params;
+                       int param_count = 0;
+                       Type **param_types = NULL;
 
-        //fprintf(stderr, "Processing function: %s\n", node->func.name);
-        //fprintf(stderr, "Parameters:\n");
+                       // Count parameters
+                       for (AST *p = param; p; p = p->next) {
+                           param_count++;
+                       }
 
-        // Count parameters
-        for (AST *p = param; p; p = p->next) {
-            param_count++;
-            //fprintf(stderr, "  Param: %s (next=%p)\n", p->decl.name, (void*)p->next);
+                       if (param_count > 0) {
+                           param_types = malloc(sizeof(Type*) * param_count);
+                           int i = 0;
+                           for (AST *p = param; p; p = p->next) {
+                               param_types[i++] = p->decl.decl_type;
+                           }
+                       }
 
-        }
-        
-        if (param_count > 0) {
-            param_types = malloc(sizeof(Type*) * param_count);
-            int i = 0;
-            for (AST *p = param; p; p = p->next) {
-                param_types[i++] = p->decl.decl_type;
-            }
-        }
-        
-        Type *ft = type_func(node->func.return_type, param_types, param_count);
-        
-        if(!add_symbol(node->func.name, ft)){
-            error("Redeclaration of variable", node);
-        }
+                       Type *ft = type_func(node->func.return_type, param_types, param_count);
 
-        enter_scope();
-        
-        // Add parameters to scope
-        for (AST *p = param; p; p = p->next) {
-            if(!add_symbol(p->decl.name, p->decl.decl_type)){
-                error("Redeclaration of variable", node);
-            }
+                       if(!add_symbol(node->func.name, ft)){
+                           error("Redeclaration of function", node);
+                       }
 
-            if(p->decl.decl_type->kind == TY_VOID){
-                error("Function parameter cannot be of type void", node);
-            }
-        }
-        
-        type_check_node(node->func.body);
-        exit_scope();
-        
-        node->type = ft;
-        break;
-    }
+                       enter_scope();
+
+                       // Add parameters to scope
+                       for (AST *p = param; p; p = p->next) {
+                           if(!add_symbol(p->decl.name, p->decl.decl_type)){
+                               error("Redeclaration of parameter", node);
+                           }
+
+                           if(p->decl.decl_type->kind == TY_VOID){
+                               error("Function parameter cannot be of type void", node);
+                           }
+                       }
+
+                       // Set current function return type for return statement checking
+                       Type *prev_return_type = current_function_return_type;
+                       current_function_return_type = node->func.return_type;
+
+                       type_check_node(node->func.body);
+
+                       // Restore previous return type (for nested functions if you support them)
+                       current_function_return_type = prev_return_type;
+
+                       exit_scope();
+
+                       node->type = ft;
+                       break;
+                   }
 
  case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
@@ -702,8 +707,40 @@ case AST_ASSIGN:
         if (node->ret.expr) {
             type_check_node(node->ret.expr);
             node->type = node->ret.expr->type;
+
+            // Check if return type matches function return type
+            if (current_function_return_type) {
+                if (current_function_return_type->kind == TY_VOID) {
+                    error("Cannot return a value from void function", node);
+                } else if (!node->ret.expr->type) {
+                    error("Return expression has no type", node);
+                } else if (!types_equal(current_function_return_type, node->ret.expr->type)) {
+                    // Allow implicit conversions between numeric types
+                    bool ret_numeric = is_numeric(current_function_return_type);
+                    bool expr_numeric = is_numeric(node->ret.expr->type);
+
+                    if (!(ret_numeric && expr_numeric)) {
+                        char buf[256];
+                        snprintf(buf, sizeof(buf),
+                                "Return type mismatch: expected %s, got %s",
+                                type_to_string(current_function_return_type),
+                                type_to_string(node->ret.expr->type));
+                        error(buf, node);
+                    }
+                }
+            }
         } else {
             node->type = type_void();
+
+            // Check if function expects a return value
+            if (current_function_return_type && 
+                    current_function_return_type->kind != TY_VOID) {
+                char buf[256];
+                snprintf(buf, sizeof(buf),
+                        "Function expects return type %s but return statement has no value",
+                        type_to_string(current_function_return_type));
+                error(buf, node);
+            }
         }
         break;
 
