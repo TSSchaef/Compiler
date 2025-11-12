@@ -21,7 +21,7 @@ will use the Makefile to create the executable "mycc". This can be used with thi
 
     `./mycc -mode infile`
 
-mode: integer (1-5)
+mode: integer (1-5)  
 infile: filepath to code for compilation 
 
 
@@ -66,3 +66,26 @@ Mode 3 requires an infile and will perform lexical analysis and parsing on it, o
  * Constants 
  * User-defined structs 
  * Struct member selection 
+
+Mode 4 requires an infile and will perform lexical analysis, parsing, and type checking on it. It will output the type of all expressions to a .types file. Supported features for the parser include:
+
+ * Literals
+ * Identifiers (global variables, local variables,
+ * parameters) 
+ * Function calls 
+ * Function returns
+ * Unary operators 
+ * Casts 
+ * Binary operators: arithmetic 
+ * Binary operators: comparison and logic 
+ * Assignment and update operators 
+ * Increment and decrement 
+ * Array indexing 
+ * Ternary operator 
+ * Prototype checking 
+ * Automatic widening 
+ * Variable initializations 
+ * Constants 
+ * User-defined structs 
+ * Struct member selection 
+ * const with struct 
