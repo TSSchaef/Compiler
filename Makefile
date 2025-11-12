@@ -12,7 +12,7 @@ PARSE=bison
 #PROD for production
 DEV-OPT=-O0
 PROD-OPT=-O3
-LIBFLAGS= -lfl
+LIBFLAGS= 
 #-lm -lpthread
 DEPFLAGS=-MP -MD
 DEV-CFLAGS=-Wall -Werror -g $(foreach D, $(INCDIRS), -I$(D)) $(DEV-OPT) $(DEPFLAGS)
