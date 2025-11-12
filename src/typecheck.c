@@ -299,6 +299,26 @@ static void link_struct_members(Type *t) {
     }
 }
 
+// Returns true if 'from' can be widened to 'to'
+static bool can_widen_to(Type *from, Type *to) {
+    if (!from || !to) return false;
+    
+    // Same type - no widening needed
+    if (from->kind == to->kind) return true;
+    
+    // char -> int -> float (widening chain)
+    if (from->kind == TY_CHAR && (to->kind == TY_INT || to->kind == TY_FLT)) {
+        return true;
+    }
+    
+    if (from->kind == TY_INT && to->kind == TY_FLT) {
+        return true;
+    }
+    
+    return false;
+}
+
+
 static void type_check_node(AST *node) {
     if (!node) return;
 
@@ -539,49 +559,75 @@ static void type_check_node(AST *node) {
              break;
         }
         
-        // For compound assignments (+=, -=, *=, /=, %=), check arithmetic compatibility
+// For compound assignments (+=, -=, *=, /=, %=), check arithmetic compatibility
         if (node->assign.op != AOP_ASSIGN) {
             // LHS must be numeric for arithmetic compound assignments
             if (node->assign.op == AOP_ADD_ASSIGN || 
-                node->assign.op == AOP_SUB_ASSIGN ||
-                node->assign.op == AOP_MUL_ASSIGN || 
-                node->assign.op == AOP_DIV_ASSIGN) {
-                
+                    node->assign.op == AOP_SUB_ASSIGN ||
+                    node->assign.op == AOP_MUL_ASSIGN || 
+                    node->assign.op == AOP_DIV_ASSIGN) {
+
                 // For array types, += and -= are valid (pointer arithmetic)
                 if (node->assign.lhs->type->kind == TY_ARRAY) {
                     if (node->assign.op == AOP_MUL_ASSIGN || 
-                        node->assign.op == AOP_DIV_ASSIGN) {
+                            node->assign.op == AOP_DIV_ASSIGN) {
                         error("Cannot use *= or /= with array/pointer type", node);
                         node->type = NULL;
                         break;
                     }
-                    // For += and -=, RHS must be integral
-                    if (!is_integral(node->assign.rhs->type)) {
+                    // For += and -=, RHS must be integral (allow widening from char to int)
+                    if (!is_integral(node->assign.rhs->type) && 
+                            node->assign.rhs->type->kind != TY_CHAR) {
                         error("Pointer arithmetic requires integer operand", node);
                         node->type = NULL;
                         break;
                     }
                 } else {
                     // For non-array types, both sides must be numeric
-                    if (!is_numeric(node->assign.lhs->type) || 
-                        !is_numeric(node->assign.rhs->type)) {
+                    // Allow widening: RHS can be widened to match LHS type
+                    if (!is_numeric(node->assign.lhs->type) && 
+                            node->assign.lhs->type->kind != TY_CHAR) {
                         error("Compound assignment requires arithmetic types", node);
+                        node->type = NULL;
+                        break;
+                    }
+
+                    // Check if RHS can be widened to LHS type
+                    if (!can_widen_to(node->assign.rhs->type, node->assign.lhs->type)) {
+                        char buf[256];
+                        snprintf(buf, sizeof(buf),
+                                "Compound assignment type mismatch: cannot assign %s to %s",
+                                type_to_string(node->assign.rhs->type),
+                                type_to_string(node->assign.lhs->type));
+                        error(buf, node);
                         node->type = NULL;
                         break;
                     }
                 }
             } else if (node->assign.op == AOP_MOD_ASSIGN) {
                 // Modulo requires integral types on both sides
-                if (!is_integral(node->assign.lhs->type) || 
-                    !is_integral(node->assign.rhs->type)) {
+                // Allow char to be widened to int
+                Type *lhs_t = node->assign.lhs->type;
+                Type *rhs_t = node->assign.rhs->type;
+
+                bool lhs_ok = (lhs_t->kind == TY_INT || lhs_t->kind == TY_CHAR);
+                bool rhs_ok = (rhs_t->kind == TY_INT || rhs_t->kind == TY_CHAR);
+
+                if (!lhs_ok || !rhs_ok) {
                     error("Modulo assignment requires integer types", node);
                     node->type = NULL;
                     break;
                 }
             } else {
                 // Bitwise compound assignments require integral types
-                if (!is_integral(node->assign.lhs->type) || 
-                    !is_integral(node->assign.rhs->type)) {
+                // Allow char to be widened to int
+                Type *lhs_t = node->assign.lhs->type;
+                Type *rhs_t = node->assign.rhs->type;
+
+                bool lhs_ok = (lhs_t->kind == TY_INT || lhs_t->kind == TY_CHAR);
+                bool rhs_ok = (rhs_t->kind == TY_INT || rhs_t->kind == TY_CHAR);
+
+                if (!lhs_ok || !rhs_ok) {
                     error("Bitwise compound assignment requires integer types", node);
                     node->type = NULL;
                     break;
@@ -619,12 +665,14 @@ static void type_check_node(AST *node) {
                 }
             } else {
                 // Both are non-arrays - allow implicit conversions between arithmetic types
-                // but don't allow completely incompatible types
-                if ((is_numeric(node->assign.lhs->type) && 
-                     !is_numeric(node->assign.rhs->type)) ||
-                    (!is_numeric(node->assign.lhs->type) && 
-                     is_numeric(node->assign.rhs->type))) {
-                    error("Type mismatch in assignment", node);
+                if (!can_widen_to(node->assign.rhs->type,
+                            node->assign.lhs->type)) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Type mismatch in assignment: cannot assign %s to %s",
+                            type_to_string(node->assign.rhs->type),
+                            type_to_string(node->assign.lhs->type));
+                    error(buf, node);
                     node->type = NULL;
                     break;
                 }
@@ -1012,24 +1060,7 @@ static void type_check_node(AST *node) {
             } else {
                 // Both are non-arrays - check basic type compatibility
                 // Allow implicit conversions between numeric types
-                bool param_numeric = is_numeric(param_type);
-                bool arg_numeric = is_numeric(arg_type);
-                
-                if (param_numeric != arg_numeric) {
-                    // One is numeric, other is not - incompatible
-                    char buf[256];
-                    snprintf(buf, sizeof(buf),
-                            "Argument %d: type mismatch (expected %s, got %s)",
-                            i + 1,
-                            type_to_string(param_type),
-                            type_to_string(arg_type));
-                    error(buf, node);
-                    node->type = NULL;
-                    break;
-                }
-                
-                // For non-numeric types, they must match exactly
-                if (!param_numeric && !types_equal(param_type, arg_type)) {
+                if (!can_widen_to(arg_type, param_type)) {
                     char buf[256];
                     snprintf(buf, sizeof(buf),
                             "Argument %d: type mismatch (expected %s, got %s)",
@@ -1112,19 +1143,14 @@ static void type_check_node(AST *node) {
                     error("Cannot return a value from void function", node);
                 } else if (!node->ret.expr->type) {
                     error("Return expression has no type", node);
-                } else if (!types_equal(current_function_return_type, node->ret.expr->type)) {
-                    // Allow implicit conversions between numeric types
-                    bool ret_numeric = is_numeric(current_function_return_type);
-                    bool expr_numeric = is_numeric(node->ret.expr->type);
-
-                    if (!(ret_numeric && expr_numeric)) {
-                        char buf[256];
-                        snprintf(buf, sizeof(buf),
-                                "Return type mismatch: expected %s, got %s",
-                                type_to_string(current_function_return_type),
-                                type_to_string(node->ret.expr->type));
-                        error(buf, node);
-                    }
+                } else if (!can_widen_to(node->ret.expr->type, current_function_return_type)) {
+                    // Type doesn't match and can't be widened
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Return type mismatch: expected %s, got %s",
+                            type_to_string(current_function_return_type),
+                            type_to_string(node->ret.expr->type));
+                    error(buf, node);
                 }
             }
         } else {
@@ -1141,6 +1167,7 @@ static void type_check_node(AST *node) {
             }
         }
         break;
+
 
     case AST_BREAK:
     case AST_CONTINUE:
