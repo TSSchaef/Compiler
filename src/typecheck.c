@@ -410,27 +410,37 @@ case AST_ASSIGN:
 
     case AST_UNARY:
         type_check_node(node->unary.operand);
+
+        if(node->unary.operand->type){
+            if(node->unary.operand->type->kind == TY_VOID){
+                error("Operand of unary operator cannot be void", node);
+                node->type = NULL;
+                break;
+            }
+        }
         
         switch (node->unary.op) {
             case UOP_PLUS:
             case UOP_NEG:
                 if (node->unary.operand->type && 
-                    is_numeric(node->unary.operand->type)) {
+                    is_numeric(node->unary.operand->type) || 
+                    is_char(node->unary.operand->type)) {
                     node->type = node->unary.operand->type;
                 } else {
-                    error("Unary +/- requires numeric operand", node);
+                    error("Unary +/- requires numeric or char operand", node);
                     node->type = NULL;
                 }
                 break;
                 
             case UOP_LOGICAL_NOT:
-                node->type = type_int();
+                node->type = type_char();
                 break;
                 
             case UOP_BITWISE_NOT:
                 if (node->unary.operand->type && 
-                    is_integral(node->unary.operand->type)) {
-                    node->type = type_int();
+                    is_integral(node->unary.operand->type) ||
+                    is_char(node->unary.operand->type)) {
+                    node->type = node->unary.operand->type;
                 } else {
                     error("Bitwise NOT requires integral operand", node);
                     node->type = NULL;
