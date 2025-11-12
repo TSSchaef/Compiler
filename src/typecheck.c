@@ -130,6 +130,29 @@ static const char *type_to_string(Type *t) {
             return "unknown";
     }
 }
+
+static const char *binop_to_string(BinOpKind op) {
+    switch (op) {
+        case OP_ADD: return "+";
+        case OP_SUB: return "-";
+        case OP_MUL: return "*";
+        case OP_DIV: return "/";
+        case OP_MOD: return "%";
+        case OP_BIT_AND: return "&";
+        case OP_BIT_OR: return "|";
+        case OP_BIT_XOR: return "^";
+        case OP_SHL: return "<<";
+        case OP_SHR: return ">>";
+        case OP_EQ: return "==";
+        case OP_NEQ: return "!=";
+        case OP_LT: return "<";
+        case OP_GT: return ">";
+        case OP_LE: return "<=";
+        case OP_GE: return ">=";
+        default: return "?";
+    }
+}
+
 // Error helper
 static void error(const char *msg, AST *node) {
     fprintf(stderr, "Type checking error in file %s line %d\n\t%s\n", 
@@ -255,7 +278,9 @@ static void type_check_node(AST *node) {
     case AST_ID: {
         Symbol *s = lookup_symbol(node->id);
         if (!s) {
-            error("Undeclared identifier", node);
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Undeclared identifier '%s'", node->id);
+            error(buf, node);
             node->type = NULL;
         } else {
             node->type = s->type;
@@ -274,13 +299,22 @@ static void type_check_node(AST *node) {
        }
 
        if (node->array.array->type->kind != TY_ARRAY) {
-           error("Tried to access a variable that isn't an array", node);
-           node->type = NULL;
+           char buf[256];
+           const char *array_name = (node->array.array->kind == AST_ID) ? 
+               node->array.array->id : "<expression>";
+           snprintf(buf, sizeof(buf), 
+                   "Subscripted value '%s' is not an array (has type %s)", 
+                   array_name, type_to_string(node->array.array->type));
+           error(buf, node);node->type = NULL;
            break;
        }
 
        if (!node->array.index->type || !is_integral(node->array.index->type)) {
-           error("Array subscript is not an integer", node);
+           char buf[256];
+           snprintf(buf, sizeof(buf), 
+                   "Array subscript has non-integer type %s", 
+                   node->array.index->type ? type_to_string(node->array.index->type) : "unknown");
+           error(buf, node);
            node->type = NULL;
            break;
        }
@@ -295,7 +329,13 @@ static void type_check_node(AST *node) {
         type_check_node(node->binop.right);
         
         if (!node->binop.left->type || !node->binop.right->type) {
-            error("Invalid operands in binary operation", node);
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Invalid operands to binary %s (have %s and %s)",
+                    binop_to_string(node->binop.op),
+                    node->binop.left->type ? type_to_string(node->binop.left->type) : "unknown",
+                    node->binop.right->type ? type_to_string(node->binop.right->type) : "unknown");
+            error(buf, node);
             node->type = NULL;
             break;
         }
@@ -308,8 +348,13 @@ static void type_check_node(AST *node) {
                 
                 if(!is_char(node->binop.left->type) || 
                         !is_char(node->binop.right->type)) {
-                    error("Arithmetic operation requires numeric \
-                            or char operands", node);
+                    char buf[256];
+                    snprintf(buf, sizeof(buf), 
+                            "Invalid operands to binary %s (have %s and %s)",
+                            binop_to_string(node->binop.op),
+                            type_to_string(node->binop.left->type),
+                            type_to_string(node->binop.right->type));
+                    error(buf, node);
                     node->type = NULL;
                 } else {
                     node->type = type_char();
@@ -331,7 +376,13 @@ static void type_check_node(AST *node) {
                  node->binop.op == OP_SHL || node->binop.op == OP_SHR) {
             if (!is_integral(node->binop.left->type) || 
                 !is_integral(node->binop.right->type)) {
-                error("Bitwise/modulo operation requires integral operands", node);
+                char buf[256];
+                snprintf(buf, sizeof(buf), 
+                        "Invalid operands to binary %s (have %s and %s)",
+                        binop_to_string(node->binop.op),
+                        type_to_string(node->binop.left->type),
+                        type_to_string(node->binop.right->type));
+                error(buf, node);
                 node->type = NULL;
             } else {
                 node->type = type_int();
@@ -354,7 +405,12 @@ case AST_ASSIGN:
         type_check_node(node->assign.rhs);
         
         if (!node->assign.lhs->type || !node->assign.rhs->type) {
-            error("Invalid operands in assignment", node);
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Invalid operands in assignment (have %s and %s)",
+                    node->assign.lhs->type ? type_to_string(node->assign.lhs->type) : "unknown",
+                    node->assign.rhs->type ? type_to_string(node->assign.rhs->type) : "unknown");
+            error(buf, node);
             node->type = NULL;
             break;
         }
@@ -362,16 +418,22 @@ case AST_ASSIGN:
         // Check basic type compatibility
         if (node->assign.lhs->type->kind == TY_VOID || 
             node->assign.rhs->type->kind == TY_VOID) {
-            error("Cannot assign void type", node);
+            error("Cannot assign to or from void type", node);
             node->type = NULL;
             break;
         }
 
         // Check if trying to assign to const
         if (node->assign.lhs->type->is_const) {
-            error("Cannot assign to const variable", node);
-            node->type = NULL;
-            break;
+             char buf[256];
+             const char *var_name = (node->assign.lhs->kind == AST_ID) ? 
+                 node->assign.lhs->id : "<expression>";
+             snprintf(buf, sizeof(buf), 
+                     "Assignment to read-only variable '%s' (type %s)",
+                     var_name, type_to_string(node->assign.lhs->type));
+             error(buf, node);
+             node->type = NULL;
+             break;
         }
         
         // For compound assignments (+=, -=, *=, /=, %=), check arithmetic compatibility
@@ -536,7 +598,15 @@ case AST_ASSIGN:
             case UOP_POST_DEC:
                 if (node->unary.operand->type) {
                     if (node->unary.operand->type->is_const) {
-                        error("Cannot increment/decrement const variable", node);
+                        char buf[256];
+                        const char *var_name = (node->unary.operand->kind == AST_ID) ? 
+                            node->unary.operand->id : "<expression>";
+                        snprintf(buf, sizeof(buf), 
+                                "Cannot %s read-only variable '%s' (type %s)",
+                                (node->unary.op == UOP_PRE_INC || node->unary.op == UOP_POST_INC) ? 
+                                "increment" : "decrement",
+                                var_name, type_to_string(node->unary.operand->type));
+                        error(buf, node);
                         node->type = NULL;
                         break;
                     }
@@ -569,67 +639,85 @@ case AST_ASSIGN:
             type_check_node(node->decl.init);
         }
         if(!add_symbol(node->decl.name, node->decl.decl_type)){
-            error("Redeclaration of variable", node);
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Redeclaration of variable '%s'", node->decl.name);
+            error(buf, node);
         }
         if(node->decl.decl_type->kind == TY_VOID){
-            error("Variable cannot be of type void", node);
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Variable '%s' declared void", node->decl.name);
+            error(buf, node);
         }
         node->type = node->decl.decl_type;
         // DON'T process node->next here - the block will handle it
         break;
 
     case AST_FUNC: {
-                       // Build function type from parameters
-                       AST *param = node->func.params;
-                       int param_count = 0;
-                       Type **param_types = NULL;
+           // Build function type from parameters
+           AST *param = node->func.params;
+           int param_count = 0;
+           Type **param_types = NULL;
 
-                       // Count parameters
-                       for (AST *p = param; p; p = p->next) {
-                           param_count++;
-                       }
+           // Count parameters
+           for (AST *p = param; p; p = p->next) {
+               param_count++;
+           }
 
-                       if (param_count > 0) {
-                           param_types = malloc(sizeof(Type*) * param_count);
-                           int i = 0;
-                           for (AST *p = param; p; p = p->next) {
-                               param_types[i++] = p->decl.decl_type;
-                           }
-                       }
+           if (param_count > 0) {
+               param_types = malloc(sizeof(Type*) * param_count);
+               int i = 0;
+               for (AST *p = param; p; p = p->next) {
+                   param_types[i++] = p->decl.decl_type;
+               }
+           }
 
-                       Type *ft = type_func(node->func.return_type, param_types, param_count);
+           Type *ft = type_func(node->func.return_type, param_types, param_count);
 
-                       if(!add_symbol(node->func.name, ft)){
-                           error("Redeclaration of function", node);
-                       }
+           if(!add_symbol(node->func.name, ft)){
+               char buf[256];
+               Symbol *existing = lookup_symbol_current(node->func.name);
+               snprintf(buf, sizeof(buf), 
+                       "Redeclaration of function '%s'", node->func.name);
+               error(buf, node);
+           }
 
-                       enter_scope();
+           enter_scope();
 
-                       // Add parameters to scope
-                       for (AST *p = param; p; p = p->next) {
-                           if(!add_symbol(p->decl.name, p->decl.decl_type)){
-                               error("Redeclaration of parameter", node);
-                           }
+           // Add parameters to scope
+           for (AST *p = param; p; p = p->next) {
+               if(!add_symbol(p->decl.name, p->decl.decl_type)){
+                   char buf[256];
+                   snprintf(buf, sizeof(buf), 
+                           "Redeclaration of parameter '%s' in function '%s'",
+                           p->decl.name, node->func.name);
+                   error(buf, node);
+               }
 
-                           if(p->decl.decl_type->kind == TY_VOID){
-                               error("Function parameter cannot be of type void", node);
-                           }
-                       }
+               if(p->decl.decl_type->kind == TY_VOID){
+                   char buf[256];
+                   snprintf(buf, sizeof(buf), 
+                           "Parameter '%s' in function '%s' declared void",
+                           p->decl.name, node->func.name);
+                   error(buf, node);
+               }
+           }
 
-                       // Set current function return type for return statement checking
-                       Type *prev_return_type = current_function_return_type;
-                       current_function_return_type = node->func.return_type;
+           // Set current function return type for return statement checking
+           Type *prev_return_type = current_function_return_type;
+           current_function_return_type = node->func.return_type;
 
-                       type_check_node(node->func.body);
+           type_check_node(node->func.body);
 
-                       // Restore previous return type (for nested functions if you support them)
-                       current_function_return_type = prev_return_type;
+           // Restore previous return type (for nested functions if you support them)
+           current_function_return_type = prev_return_type;
 
-                       exit_scope();
+           exit_scope();
 
-                       node->type = ft;
-                       break;
-                   }
+           node->type = ft;
+           break;
+        }
 
  case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
