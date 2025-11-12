@@ -173,6 +173,23 @@ AST *ast_block(AST **statements, int count) {
     return n;
 }
 
+AST *ast_member_access(AST *object, const char *member_name) {
+    AST *n = ast_alloc();
+    n->kind = AST_MEMBER_ACCESS;
+    n->line_no = object->line_no; /* inherit line number from object expr */
+    n->member.object = object;
+    n->member.member_name = strdup(member_name ? member_name : "");
+    return n;
+}
+
+AST *ast_struct_def(const char *name, AST *members) {
+    AST *n = ast_alloc();
+    n->kind = AST_STRUCT_DEF;
+    n->struct_def.name = strdup(name ? name : "");
+    n->struct_def.members = members;
+    return n;
+}
+
 
 AST *ast_list_prepend(AST *node, AST *head) {
     if (!head) return node;
@@ -525,6 +542,26 @@ static void ast_print_helper(AST *node, int indent) {
             }
             break;
 
+        case AST_MEMBER_ACCESS:
+            printf("MEMBER_ACCESS\n");
+            ast_print_indent(indent + 2);
+            printf("object:\n");
+            ast_print_helper(node->member.object, indent + 4);
+            ast_print_indent(indent + 2);
+            printf("member: %s\n", node->member.member_name ? node->member.member_name : "(null)");
+            break;
+
+        case AST_STRUCT_DEF:
+            printf("STRUCT_DEF: %s\n", node->struct_def.name ? node->struct_def.name : "(null)");
+            if (node->struct_def.members) {
+                ast_print_indent(indent + 2);
+                printf("members:\n");
+                for (AST *m = node->struct_def.members; m; m = m->next) {
+                    ast_print_helper(m, indent + 4);
+                }
+            }
+            break;
+
         case AST_IF:
             printf("IF\n");
             ast_print_indent(indent + 2);
@@ -712,6 +749,23 @@ void ast_free(AST *node) {
                     ast_free(node->block.statements[i]);
                 }
                 free(node->block.statements);
+            }
+            free(node);
+            break;
+
+        case AST_MEMBER_ACCESS:
+            ast_free(node->member.object);
+            free(node->member.member_name);
+            free(node);
+            break;
+
+        case AST_STRUCT_DEF:
+            free(node->struct_def.name);
+            // Free members (linked list)
+            for (AST *m = node->struct_def.members; m; ) {
+                AST *next = m->next;
+                ast_free(m);
+                m = next;
             }
             free(node);
             break;

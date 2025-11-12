@@ -41,6 +41,41 @@ static struct Type *type_from_name(const char *name) {
 
 struct Type *curr_type;
 
+static struct Type *type_from_struct_name(const char *name) {
+    if (!name) return NULL;
+    
+    // Look up the struct definition
+    Type *struct_def = lookup_struct(name);
+    if (!struct_def) {
+        // Return a placeholder type that will be caught by type checker
+        Type *t = malloc(sizeof(Type));
+        t->kind = TY_STRUCT;
+        t->is_const = false;
+        t->struct_name = strdup(name);
+        t->members = NULL;
+        t->member_count = 0;
+        t->return_type = NULL;
+        t->array_of = NULL;
+        t->params = NULL;
+        t->param_count = 0;
+        return t;
+    }
+    
+    // Return a copy of the struct type that references the same members
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_STRUCT;
+    t->is_const = false;
+    t->struct_name = strdup(struct_def->struct_name);
+    t->members = struct_def->members;  // Share the member list
+    t->member_count = struct_def->member_count;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    
+    return t;
+}
+
 %}
 
 %union {
@@ -103,7 +138,7 @@ struct Type *curr_type;
 %token BITWISE      308
 
 
-%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_assignment opt_ident_list opt_ident_local_list opt_param_list opt_param_list_tail opt_fun_body opt_expr INCRDEC_PREFIX
+%type <ast> Program C Var Var_local Struct_def Struct_local_def Struct_members Struct_member Fun_dec Fun_proto Fun_def Stat_block Stat_block_body Stat unmatched_stmt matched_stmt expr assignment_expression conditional_expression logical_or_expression logical_and_expression bitwise_or_expression bitwise_xor_expression bitwise_and_expression equality_expression relational_expression additive_expression multiplicative_expression unary_expression postfix_expression primary lvalue lvalue_postfix argument_expression_list_opt argument_expression_list opt_assignment opt_ident_list opt_ident_local_list opt_param_list opt_param_list_tail opt_fun_body opt_expr opt_member_list INCRDEC_PREFIX
 
 %type <type> opt_const_type type_with_struct
 %type <boolval> opt_array opt_empty_array
@@ -149,9 +184,8 @@ C :  Var C          { $$ = ast_list_prepend($1, $2); }
   ;
 
 type_with_struct : TYPE             { $$ = type_from_name($1); free($1); }
-                 | STRUCT IDENT 
+                 | STRUCT IDENT     { $$ = type_from_struct_name($2); free($2); }
                  ;
-
 
 opt_const_type : CONST type_with_struct     { $$ = set_const($2); }
                | type_with_struct CONST     { $$ = set_const($1); }
@@ -223,20 +257,44 @@ opt_ident_local_list :  {$$ = NULL; }
 
 
 Struct_def : STRUCT IDENT {print_ident("global struct", $2);} '{' Struct_members '}' ';' 
+            {
+                $$ = ast_set_line_no(ast_struct_def($2, $5), yylineno);
+            }
            ;
 
 Struct_local_def : STRUCT IDENT {print_ident("local struct", $2);} '{' Struct_members '}' ';' 
+            {
+                $$ = ast_set_line_no(ast_struct_def($2, $5), yylineno);
+            }
            ;
 
-Struct_members : Struct_member Struct_members
-               |
+Struct_members : Struct_member Struct_members  { $$ = ast_list_prepend($1, $2); }
+               |                                { $$ = NULL; }
                ;
 
-Struct_member : opt_const_type IDENT {print_ident("member", $2);} opt_array opt_member_list ';'
+Struct_member : opt_const_type IDENT {print_ident("member", $2); curr_type = $1;} opt_array opt_member_list ';'
+              {
+                  AST *decl;
+                  if($4){
+                      decl = ast_set_line_no(ast_decl($2, type_array($1), NULL), yylineno);
+                  } else {
+                      decl = ast_set_line_no(ast_decl($2, $1, NULL), yylineno);
+                  }
+                  $$ = ast_list_prepend(decl, $5);
+              }
               ;
 
-opt_member_list : 
-           | ',' IDENT {print_ident("member", $2);} opt_array opt_member_list;
+opt_member_list :                                                       { $$ = NULL; }
+           | ',' IDENT {print_ident("member", $2);} opt_array opt_member_list
+              {
+                  AST *decl;
+                  if($4){
+                      decl = ast_set_line_no(ast_decl($2, type_array(curr_type), NULL), yylineno);
+                  } else {
+                      decl = ast_set_line_no(ast_decl($2, curr_type, NULL), yylineno);
+                  }
+                  $$ = ast_list_prepend(decl, $5);
+              }
            ;
 
 
@@ -515,11 +573,12 @@ lvalue : IDENT
         }
 
     | lvalue '.' IDENT              
-        { $$ = ast_set_line_no(ast_id($3), yylineno); }
+        { $$ = ast_set_line_no(ast_member_access($1, $3), yylineno); }
 
     | lvalue '.' IDENT '[' expr ']' 
         { 
-            $$ = ast_array_access(ast_set_line_no(ast_id($3), yylineno), $5);
+            AST *member = ast_set_line_no(ast_member_access($1, $3), yylineno);
+            $$ = ast_array_access(member, $5);
         }
     ;
 

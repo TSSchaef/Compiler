@@ -20,6 +20,9 @@ Type *type_int_const(bool is_const) {
     t->array_of = NULL;
     t->params = NULL;
     t->param_count = 0;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
     return t;
 }
 
@@ -31,6 +34,9 @@ Type *type_char_const(bool is_const) {
     Type *t = malloc(sizeof(Type));
     t->kind = TY_CHAR;
     t->is_const = is_const;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
     return t;
 }
 
@@ -42,6 +48,9 @@ Type *type_float_const(bool is_const) {
     Type *t = malloc(sizeof(Type));
     t->kind = TY_FLT;
     t->is_const = is_const;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
     return t;
 }
 
@@ -53,6 +62,9 @@ Type *type_void_const(bool is_const) {
     Type *t = malloc(sizeof(Type));
     t->kind = TY_VOID;
     t->is_const = is_const;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
     return t;
 }
 
@@ -68,6 +80,9 @@ Type *type_array(Type *elem_type) {
     t->kind = TY_ARRAY;
     t->is_const = false;
     t->array_of = elem_type;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
     return t;
 }
 
@@ -77,6 +92,9 @@ Type *type_func(Type *ret, Type **params, int param_count) {
     ft->return_type = ret;
     ft->params = params;
     ft->param_count = param_count;
+    ft->struct_name = NULL;
+    ft->members = NULL;
+    ft->member_count = 0;
     return ft;
 }
 
@@ -99,6 +117,10 @@ static const char *type_to_string(Type *t) {
             return buf;
         case TY_VOID: 
             return "void";
+        case TY_STRUCT:
+            snprintf(buf, sizeof(buf), "%sstruct %s", const_prefix, 
+                     t->struct_name ? t->struct_name : "<anonymous>");
+            return buf;
         case TY_ARRAY: {
             // Get the base element type string (without any const)
             Type *elem = t->array_of;
@@ -113,11 +135,15 @@ static const char *type_to_string(Type *t) {
                 case TY_CHAR: base_type = "char"; break;
                 case TY_FLT: base_type = "float"; break;
                 case TY_VOID: base_type = "void"; break;
+                case TY_STRUCT:
+                    snprintf(buf, sizeof(buf), "%sstruct %s[]", elem_const,
+                             elem->struct_name ? elem->struct_name : "<anonymous>");
+                    return buf;
                 case TY_ARRAY:
-                              // Nested array - recursively get the type
-                              base_type = type_to_string(elem);
-                              snprintf(buf, sizeof(buf), "%s[]", base_type);
-                              return buf;
+                    // Nested array - recursively get the type
+                    base_type = type_to_string(elem);
+                    snprintf(buf, sizeof(buf), "%s[]", base_type);
+                    return buf;
                 default: base_type = "unknown"; break;
             }
 
@@ -169,6 +195,12 @@ static bool types_equal(Type *t1, Type *t2) {
         return types_equal(t1->array_of, t2->array_of);
     }
     
+    if (t1->kind == TY_STRUCT) {
+        // Structs are equal if they have the same name
+        if (!t1->struct_name || !t2->struct_name) return false;
+        return strcmp(t1->struct_name, t2->struct_name) == 0;
+    }
+    
     return true;
 }
 
@@ -206,6 +238,7 @@ static bool is_expression_statement(AST *stmt) {
         case AST_CONTINUE:
         case AST_SWITCH:
         case AST_CASE:
+        case AST_STRUCT_DEF:
             return false;
         
         // These ARE expression statements
@@ -218,6 +251,7 @@ static bool is_expression_statement(AST *stmt) {
         case AST_TERNARY:
         case AST_ID:
         case AST_ARRAY_ACCESS:
+        case AST_MEMBER_ACCESS:
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:
         case AST_STRING_LITERAL:
@@ -244,10 +278,26 @@ static void check_expression_statement(AST *expr) {
     }
 }
 
+static void link_struct_members(Type *t) {
+    if (!t) return;
+    
+    if (t->kind == TY_STRUCT && t->struct_name) {
+        // If this struct type doesn't have members, look them up
+        if (!t->members || t->member_count == 0) {
+            Type *struct_def = lookup_struct(t->struct_name);
+            if (struct_def) {
+                t->members = struct_def->members;
+                t->member_count = struct_def->member_count;
+            }
+        }
+    } else if (t->kind == TY_ARRAY) {
+        // Recursively handle array element types
+        link_struct_members(t->array_of);
+    }
+}
+
 static void type_check_node(AST *node) {
     if (!node) return;
-
-    //fprintf(stderr, "Type checking node kind=%d, line=%d\n", node->kind, node->line_no);
 
     switch (node->kind) {
     case AST_INT_LITERAL:
@@ -288,6 +338,55 @@ static void type_check_node(AST *node) {
         break;
     }
 
+    case AST_MEMBER_ACCESS: {
+        type_check_node(node->member.object);
+        
+        if (!node->member.object->type) {
+            error("Member access on expression with no type", node);
+            node->type = NULL;
+            break;
+        }
+        
+        Type *obj_type = node->member.object->type;
+        
+        // Check if the object is a struct type
+        if (obj_type->kind != TY_STRUCT) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Member access on non-struct type %s",
+                    type_to_string(obj_type));
+            error(buf, node);
+            node->type = NULL;
+            break;
+        }
+        
+        // Find the member in the struct
+        StructMember *member = struct_member_find(obj_type, node->member.member_name);
+        if (!member) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), 
+                    "Struct %s has no member named '%s'",
+                    obj_type->struct_name, node->member.member_name);
+            error(buf, node);
+            node->type = NULL;
+            break;
+        }
+        
+        // The type of s.m is the type of member m
+        node->type = member->type;
+        
+        // If the struct variable is const, all members become const
+        if (obj_type->is_const && node->type) {
+            // Create a copy of the member type with const set
+            Type *const_type = malloc(sizeof(Type));
+            memcpy(const_type, node->type, sizeof(Type));
+            const_type->is_const = true;
+            node->type = const_type;
+        }
+        
+        break;
+    }
+
     case AST_ARRAY_ACCESS: {
        type_check_node(node->array.array);
        type_check_node(node->array.index);
@@ -305,7 +404,8 @@ static void type_check_node(AST *node) {
            snprintf(buf, sizeof(buf), 
                    "Subscripted value '%s' is not an array (has type %s)", 
                    array_name, type_to_string(node->array.array->type));
-           error(buf, node);node->type = NULL;
+           error(buf, node);
+           node->type = NULL;
            break;
        }
 
@@ -400,7 +500,7 @@ static void type_check_node(AST *node) {
 
         break;
 
-case AST_ASSIGN:
+    case AST_ASSIGN:
         type_check_node(node->assign.lhs);
         type_check_node(node->assign.rhs);
         
@@ -506,6 +606,14 @@ case AST_ASSIGN:
                 error("Type mismatch: cannot assign array to non-array", node);
                 node->type = NULL;
                 break;
+            } else if (node->assign.lhs->type->kind == TY_STRUCT || 
+                       node->assign.rhs->type->kind == TY_STRUCT) {
+                // Struct assignments must match types exactly
+                if (!types_equal(node->assign.lhs->type, node->assign.rhs->type)) {
+                    error("Type mismatch: cannot assign different struct types", node);
+                    node->type = NULL;
+                    break;
+                }
             } else {
                 // Both are non-arrays - allow implicit conversions between arithmetic types
                 // but don't allow completely incompatible types
@@ -633,11 +741,27 @@ case AST_ASSIGN:
         break;
 
     case AST_DECL:
-        //fprintf(stderr, "  DECL name=%s, next=%p\n", node->decl.name, (void*)node->next);
-
         if (node->decl.init) {
             type_check_node(node->decl.init);
         }
+
+        // Ensure struct types have their members properly linked
+        link_struct_members(node->decl.decl_type);
+
+        // Check if it's a struct type declaration
+        if (node->decl.decl_type && node->decl.decl_type->kind == TY_STRUCT) {
+            // Verify the struct type exists
+            Type *struct_def = lookup_struct(node->decl.decl_type->struct_name);
+            if (!struct_def) {
+                char buf[256];
+                snprintf(buf, sizeof(buf), 
+                        "Variable '%s' declared with undefined struct type '%s'",
+                        node->decl.name, node->decl.decl_type->struct_name);
+                error(buf, node);
+                // Don't return - still add to symbol table to avoid cascading errors
+            }
+        }
+
         if(!add_symbol(node->decl.name, node->decl.decl_type)){
             char buf[256];
             snprintf(buf, sizeof(buf), 
@@ -651,8 +775,62 @@ case AST_ASSIGN:
             error(buf, node);
         }
         node->type = node->decl.decl_type;
-        // DON'T process node->next here - the block will handle it
         break;
+
+    case AST_STRUCT_DEF: {
+         // Process struct definition
+         const char *struct_name = node->struct_def.name;
+
+         // Check if struct is already defined in current scope
+         Type *existing = lookup_struct_current(struct_name);
+         if (existing) {
+             char buf[256];
+             snprintf(buf, sizeof(buf), 
+                     "Redefinition of struct '%s'", struct_name);
+             error(buf, node);
+             node->type = NULL;
+             break;
+         }
+
+         // Build member list
+         StructMember *members = NULL;
+         StructMember *last_member = NULL;
+         int member_count = 0;
+
+         for (AST *member_node = node->struct_def.members; member_node; 
+                 member_node = member_node->next) {
+
+             if (member_node->kind != AST_DECL) continue;
+
+             // Make sure struct member types have their members linked
+             link_struct_members(member_node->decl.decl_type);
+
+             StructMember *m = struct_member_create(member_node->decl.name, 
+                     member_node->decl.decl_type);
+
+             if (!members) {
+                 members = m;
+             } else {
+                 last_member->next = m;
+             }
+             last_member = m;
+             member_count++;
+         }
+
+         // Create struct type and add to symbol table
+         Type *struct_type = type_struct(struct_name, members, member_count);
+
+         if (!add_struct(struct_name, struct_type)) {
+             char buf[256];
+             snprintf(buf, sizeof(buf), 
+                     "Failed to add struct '%s' to symbol table", struct_name);
+             error(buf, node);
+         }
+
+         node->type = struct_type;
+         break;
+     }
+
 
     case AST_FUNC: {
            // Build function type from parameters
@@ -687,6 +865,18 @@ case AST_ASSIGN:
 
            // Add parameters to scope
            for (AST *p = param; p; p = p->next) {
+               // Check if parameter is a struct type
+               if (p->decl.decl_type && p->decl.decl_type->kind == TY_STRUCT) {
+                   Type *struct_def = lookup_struct(p->decl.decl_type->struct_name);
+                   if (!struct_def) {
+                       char buf[256];
+                       snprintf(buf, sizeof(buf), 
+                               "Parameter '%s' in function '%s' declared with undefined struct type '%s'",
+                               p->decl.name, node->func.name, p->decl.decl_type->struct_name);
+                       error(buf, node);
+                   }
+               }
+               
                if(!add_symbol(p->decl.name, p->decl.decl_type)){
                    char buf[256];
                    snprintf(buf, sizeof(buf), 
@@ -719,7 +909,7 @@ case AST_ASSIGN:
            break;
         }
 
- case AST_FUNC_CALL: {
+     case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
         
         // Type check arguments
@@ -803,6 +993,19 @@ case AST_ASSIGN:
                 error(buf, node);
                 node->type = NULL;
                 break;
+            } else if (param_type->kind == TY_STRUCT || arg_type->kind == TY_STRUCT) {
+                // Struct types must match exactly
+                if (!types_equal(param_type, arg_type)) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                            "Argument %d: type mismatch (expected %s, got %s)",
+                            i + 1,
+                            type_to_string(param_type),
+                            type_to_string(arg_type));
+                    error(buf, node);
+                    node->type = NULL;
+                    break;
+                }
             } else {
                 // Both are non-arrays - check basic type compatibility
                 // Allow implicit conversions between numeric types

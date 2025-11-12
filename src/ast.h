@@ -22,6 +22,7 @@ typedef enum {
 
     AST_ID,
     AST_ARRAY_ACCESS,
+    AST_MEMBER_ACCESS,  /* struct member access (.) */
 
     AST_BINOP,
     AST_ASSIGN,      
@@ -34,6 +35,7 @@ typedef enum {
     AST_FUNC,
     AST_FUNC_CALL,
     AST_BLOCK,
+    AST_STRUCT_DEF,  /* struct definition */
 
     AST_IF,
     AST_WHILE,
@@ -122,6 +124,11 @@ typedef struct AST {
         } array;
 
         struct {
+            struct AST *object;     /* The struct variable/expression */
+            char *member_name;      /* The member being accessed */
+        } member;
+
+        struct {
             BinOpKind op;
             struct AST *left;
             struct AST *right;
@@ -175,6 +182,11 @@ typedef struct AST {
             int count;
         } block;
 
+        struct {
+            char *name;             /* struct name */
+            struct AST *members;    /* linked list of member declarations */
+        } struct_def;
+
         /* if: cond, then_branch, else_branch (else_branch may be NULL) */
         struct { 
             struct AST *cond;
@@ -212,6 +224,7 @@ AST *ast_char(char c);
 AST *ast_bool(bool b);
 
 AST *ast_array_access(AST *array, AST *index);
+AST *ast_member_access(AST *object, const char *member_name);
 
 AST *ast_binop(BinOpKind op, AST *l, AST *r);
 AST *ast_assign(AssignOpKind op, AST *lhs, AST *rhs);
@@ -226,6 +239,7 @@ AST *ast_decl(const char *name, struct Type *decl_type, AST *init);
 AST *ast_func(const char *name, struct Type *return_type, AST *params, AST *body);
 AST *ast_func_call(AST *callee, AST *args); /* args is linked list via AST->next; may be NULL */
 AST *ast_block(AST **statements, int count);
+AST *ast_struct_def(const char *name, AST *members);
 
 AST *ast_if(AST *cond, AST *then_branch, AST *else_branch);
 AST *ast_while(AST *cond, AST *body);

@@ -30,5 +30,6 @@ Type *type_array(Type *elem_type);
 Type *type_func(Type *ret, Type **params, int param_count);
 
 void type_check(AST *root);
+void type_check_program(AST *root);
 
 #endif

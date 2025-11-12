@@ -18,6 +18,7 @@ static Scope *new_scope(Scope *parent) {
     s->bucket_count = DEFAULT_BUCKETS;
     s->var_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->func_table = calloc(s->bucket_count, sizeof(Symbol *));
+    s->struct_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->parent = parent;
     return s;
 }
@@ -55,9 +56,21 @@ void exit_scope() {
         }
     }
 
+    // free symbols in struct table
+    for (int i = 0; i < current_scope->bucket_count; i++) {
+        Symbol *sym = current_scope->struct_table[i];
+        while (sym) {
+            Symbol *next = sym->next;
+            free(sym->name);
+            free(sym);
+            sym = next;
+        }
+    }
+
     Scope *parent = current_scope->parent;
     free(current_scope->var_table);
     free(current_scope->func_table);
+    free(current_scope->struct_table);
     free(current_scope);
     current_scope = parent;
 }
@@ -131,5 +144,97 @@ Symbol *lookup_symbol(const char *name) {
             sym = sym->next;
         }
     }
+    return NULL;
+}
+
+// Struct-specific functions
+
+bool add_struct(const char *name, Type *struct_type) {
+    if (!current_scope) init_symtab();
+    
+    unsigned idx = hash(name, current_scope->bucket_count);
+    
+    // Check if struct already exists in current scope
+    Symbol *sym = current_scope->struct_table[idx];
+    while (sym) {
+        if (strcmp(sym->name, name) == 0) {
+            return false; // Struct already defined in this scope
+        }
+        sym = sym->next;
+    }
+    
+    // Add new struct definition
+    Symbol *new_sym = malloc(sizeof(Symbol));
+    new_sym->name = strdup(name);
+    new_sym->type = struct_type;
+    new_sym->next = current_scope->struct_table[idx];
+    
+    current_scope->struct_table[idx] = new_sym;
+    return true;
+}
+
+Type *lookup_struct_current(const char *name) {
+    if (!current_scope) return NULL;
+    unsigned idx = hash(name, current_scope->bucket_count);
+    
+    Symbol *sym = current_scope->struct_table[idx];
+    while (sym) {
+        if (strcmp(sym->name, name) == 0)
+            return sym->type;
+        sym = sym->next;
+    }
+    
+    return NULL;
+}
+
+Type *lookup_struct(const char *name) {
+    for (Scope *s = current_scope; s; s = s->parent) {
+        unsigned idx = hash(name, s->bucket_count);
+        
+        Symbol *sym = s->struct_table[idx];
+        while (sym) {
+            if (strcmp(sym->name, name) == 0)
+                return sym->type;
+            sym = sym->next;
+        }
+    }
+    return NULL;
+}
+
+// Helper functions for struct types and members
+
+Type *type_struct(const char *name, StructMember *members, int member_count) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_STRUCT;
+    t->is_const = false;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    t->struct_name = strdup(name);
+    t->members = members;
+    t->member_count = member_count;
+    return t;
+}
+
+StructMember *struct_member_create(const char *name, Type *type) {
+    StructMember *m = malloc(sizeof(StructMember));
+    m->name = strdup(name);
+    m->type = type;
+    m->next = NULL;
+    return m;
+}
+
+StructMember *struct_member_find(Type *struct_type, const char *member_name) {
+    if (!struct_type || struct_type->kind != TY_STRUCT) {
+        return NULL;
+    }
+    
+    for (StructMember *m = struct_type->members; m; m = m->next) {
+        if (strcmp(m->name, member_name) == 0) {
+            return m;
+        }
+    }
+    
     return NULL;
 }
