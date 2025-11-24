@@ -70,11 +70,10 @@ int main(int argc, char *argv[]){
             init_symtab();
             yyparse();
 
-            //ast_print(root_ast);
+            ast_print(root_ast);
             
             type_check(root_ast);
             generate_code(root_ast);
-
 
             ast_free(root_ast);
 

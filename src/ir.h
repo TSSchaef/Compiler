@@ -71,4 +71,6 @@ void ir_emit_float(IRList *l, IRKind k, float f);
 
 void generate_ir_from_ast(AST *ast, IRList *out);
 
+void ir_print(IRList *ir, FILE *out);
+
 #endif

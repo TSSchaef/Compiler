@@ -35,6 +35,144 @@ void ir_emit_float(IRList *l, IRKind k, float f) {
     }
 }
 
+// Print IR in readable format for debugging
+void ir_print(IRList *ir, FILE *out) {
+    if (!ir || !out) return;
+    
+    fprintf(out, "=== IR Instructions ===\n");
+    int count = 0;
+    for (IRInstruction *p = ir->head; p; p = p->next) {
+        fprintf(out, "%3d: ", count++);
+        
+        switch(p->kind) {
+            case IR_NOP:
+                fprintf(out, "NOP\n");
+                break;
+            case IR_LABEL:
+                fprintf(out, "LABEL %s\n", p->s ? p->s : "?");
+                break;
+            case IR_JUMP:
+                fprintf(out, "JUMP %s\n", p->s ? p->s : "?");
+                break;
+            case IR_JUMP_IF_ZERO:
+                fprintf(out, "JUMP_IF_ZERO %s\n", p->s ? p->s : "?");
+                break;
+            case IR_LOAD_GLOBAL:
+                fprintf(out, "LOAD_GLOBAL %s\n", p->s ? p->s : "?");
+                break;
+            case IR_STORE_GLOBAL:
+                fprintf(out, "STORE_GLOBAL %s\n", p->s ? p->s : "?");
+                break;
+            case IR_LOAD_LOCAL:
+                fprintf(out, "LOAD_LOCAL %d\n", p->i);
+                break;
+            case IR_STORE_LOCAL:
+                fprintf(out, "STORE_LOCAL %d\n", p->i);
+                break;
+            case IR_PUSH_INT:
+                fprintf(out, "PUSH_INT %d\n", p->i);
+                break;
+            case IR_PUSH_FLOAT:
+                fprintf(out, "PUSH_FLOAT %f\n", p->f);
+                break;
+            case IR_PUSH_STRING:
+                fprintf(out, "PUSH_STRING \"%s\"\n", p->s ? p->s : "");
+                break;
+            case IR_ADD:
+                fprintf(out, "ADD\n");
+                break;
+            case IR_SUB:
+                fprintf(out, "SUB\n");
+                break;
+            case IR_MUL:
+                fprintf(out, "MUL\n");
+                break;
+            case IR_DIV:
+                fprintf(out, "DIV\n");
+                break;
+            case IR_MOD:
+                fprintf(out, "MOD\n");
+                break;
+            case IR_NEG:
+                fprintf(out, "NEG\n");
+                break;
+            case IR_BIT_AND:
+                fprintf(out, "BIT_AND\n");
+                break;
+            case IR_BIT_OR:
+                fprintf(out, "BIT_OR\n");
+                break;
+            case IR_BIT_XOR:
+                fprintf(out, "BIT_XOR\n");
+                break;
+            case IR_BIT_NOT:
+                fprintf(out, "BIT_NOT\n");
+                break;
+            case IR_SHL:
+                fprintf(out, "SHL\n");
+                break;
+            case IR_SHR:
+                fprintf(out, "SHR\n");
+                break;
+            case IR_EQ:
+                fprintf(out, "EQ\n");
+                break;
+            case IR_NEQ:
+                fprintf(out, "NEQ\n");
+                break;
+            case IR_LT:
+                fprintf(out, "LT\n");
+                break;
+            case IR_GT:
+                fprintf(out, "GT\n");
+                break;
+            case IR_LE:
+                fprintf(out, "LE\n");
+                break;
+            case IR_GE:
+                fprintf(out, "GE\n");
+                break;
+            case IR_CALL:
+                fprintf(out, "CALL %s (argc=%d)\n", p->s ? p->s : "?", p->i);
+                break;
+            case IR_RETURN:
+                fprintf(out, "RETURN\n");
+                break;
+            case IR_RETURN_VOID:
+                fprintf(out, "RETURN_VOID\n");
+                break;
+            case IR_POP:
+                fprintf(out, "POP\n");
+                break;
+            case IR_DUP:
+                fprintf(out, "DUP\n");
+                break;
+            case IR_CAST_I2F:
+                fprintf(out, "CAST_I2F\n");
+                break;
+            case IR_CAST_F2I:
+                fprintf(out, "CAST_F2I\n");
+                break;
+            case IR_CAST_I2D:
+                fprintf(out, "CAST_I2D\n");
+                break;
+            case IR_CAST_D2I:
+                fprintf(out, "CAST_D2I\n");
+                break;
+            case IR_CAST_F2D:
+                fprintf(out, "CAST_F2D\n");
+                break;
+            case IR_CAST_D2F:
+                fprintf(out, "CAST_D2F\n");
+                break;
+            default:
+                fprintf(out, "UNKNOWN(%d)\n", p->kind);
+                break;
+        }
+    }
+    fprintf(out, "=== End IR ===\n\n");
+}
+
 static void gen_expr(AST *n, IRList *out);
 
 static void gen_binop(AST *n, IRList *out) {

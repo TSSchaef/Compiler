@@ -1,5 +1,6 @@
 #include "jbcgen.h"
 #include "symtab.h"
+#include "ast.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -31,9 +32,18 @@ void emit_global_field(FILE *out, const char *name, Type *type) {
             case TY_FLT: type_desc = "F"; break;
             case TY_CHAR: type_desc = "C"; break;
             case TY_VOID: type_desc = "V"; break;
-            case TY_ARRAY: type_desc = "[I"; break; // simplified - array of int
-            case TY_FUNC: type_desc = "I"; break; // shouldn't happen for fields
-            case TY_STRUCT: type_desc = "Ljava/lang/Object;"; break; // treat as object
+            case TY_ARRAY: 
+                if (type->array_of) {
+                    if (type->array_of->kind == TY_CHAR) type_desc = "[C";
+                    else if (type->array_of->kind == TY_INT) type_desc = "[I";
+                    else if (type->array_of->kind == TY_FLT) type_desc = "[F";
+                    else type_desc = "[I";
+                } else {
+                    type_desc = "[I";
+                }
+                break;
+            case TY_FUNC: type_desc = "I"; break;
+            case TY_STRUCT: type_desc = "Ljava/lang/Object;"; break;
             default: type_desc = "I"; break;
         }
     }
@@ -50,32 +60,16 @@ static const char* get_type_descriptor(Type *type) {
         case TY_FLT: return "F";
         case TY_CHAR: return "C";
         case TY_ARRAY: 
-            // For arrays, return the array descriptor
             if (type->array_of) {
                 if (type->array_of->kind == TY_CHAR) return "[C";
                 if (type->array_of->kind == TY_INT) return "[I";
                 if (type->array_of->kind == TY_FLT) return "[F";
             }
-            return "[I"; // default to int array
-        case TY_FUNC: return "I"; // shouldn't happen as a descriptor
+            return "[I";
+        case TY_FUNC: return "I";
         case TY_STRUCT: return "Ljava/lang/Object;";
         default: return "I";
     }
-}
-
-static void emit_method_signature(FILE *out, const char *classname, const char *name, Type *return_type, AST *params) {
-    fprintf(out, "\n.method public static %s(", name);
-    
-    // Emit parameter types
-    AST *p = params;
-    while (p) {
-        if (p->kind == AST_DECL) {
-            fprintf(out, "%s", get_type_descriptor(p->decl.decl_type));
-        }
-        p = p->next;
-    }
-    
-    fprintf(out, ")%s\n", get_type_descriptor(return_type));
 }
 
 void emit_method_header(FILE *out, const char *classname, const char *name, Type *return_type, AST *params) {
@@ -96,7 +90,7 @@ void emit_method_header(FILE *out, const char *classname, const char *name, Type
 
 void emit_method_footer(FILE *out) {
     fprintf(out, ".end code\n");
-    fprintf(out, ".end method\n\n");
+    fprintf(out, ".end method\n");
 }
 
 static void emit_comparison(FILE *out, IRKind kind) {
@@ -116,10 +110,10 @@ static void emit_comparison(FILE *out, IRKind kind) {
     }
     
     fprintf(out, "    %s L%d\n", cmp_instr, true_label);
-    fprintf(out, "    ldc 0\n");
+    fprintf(out, "    iconst_0\n");
     fprintf(out, "    goto L%d\n", end_label);
     fprintf(out, "L%d:\n", true_label);
-    fprintf(out, "    ldc 1\n");
+    fprintf(out, "    iconst_1\n");
     fprintf(out, "L%d:\n", end_label);
 }
 
@@ -127,7 +121,6 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
             case IR_PUSH_INT:
-                // Use iconst for small constants, ldc for larger ones
                 if (p->i == -1) {
                     fprintf(out, "    iconst_m1\n");
                 } else if (p->i >= 0 && p->i <= 5) {
@@ -147,7 +140,6 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 
             case IR_PUSH_STRING:
                 fprintf(out, "    ldc \"%s\"\n", p->s);
-                // Convert Java string to C char array for lib440
                 fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
@@ -160,11 +152,11 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_LOAD_LOCAL:
-                fprintf(out, "    iload %d\n", p->i);
+                fprintf(out, "    iload_%d\n", p->i);
                 break;
                 
             case IR_STORE_LOCAL:
-                fprintf(out, "    istore %d\n", p->i);
+                fprintf(out, "    istore_%d\n", p->i);
                 break;
                 
             case IR_ADD:
@@ -204,7 +196,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_BIT_NOT:
-                fprintf(out, "    ldc -1\n");
+                fprintf(out, "    iconst_m1\n");
                 fprintf(out, "    ixor\n");
                 break;
                 
@@ -226,10 +218,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_CALL:
-                // Generate function call
-                // Check if it's a standard library function
                 if (is_stdlib_function(p->s)) {
-                    // Call from lib440 class
                     if (strcmp(p->s, "getchar") == 0) {
                         fprintf(out, "    invokestatic Method lib440 getchar ()I\n");
                     } else if (strcmp(p->s, "putchar") == 0) {
@@ -246,9 +235,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                         fprintf(out, "    invokestatic Method lib440 putstring ([C)V\n");
                     }
                 } else {
-                    // User-defined function - call from current class
                     fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
-                    // Parameter types - simplified, assumes all int
                     for (int i = 0; i < p->i; i++) {
                         fprintf(out, "I");
                     }
@@ -280,40 +267,24 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    f2i\n");
                 break;
                 
-            case IR_CAST_I2D:
-                fprintf(out, "    i2d\n");
-                break;
-                
-            case IR_CAST_D2I:
-                fprintf(out, "    d2i\n");
-                break;
-                
-            case IR_CAST_F2D:
-                fprintf(out, "    f2d\n");
-                break;
-                
-            case IR_CAST_D2F:
-                fprintf(out, "    d2f\n");
-                break;
-                
             default:
-                fprintf(out, "    ; unhandled IR op %d\n", p->kind);
+                break;
         }
     }
 }
 
 void emit_init_method(FILE *out, const char *classname) {
-    fprintf(out, ".method <init> : ()V\n");
+    fprintf(out, "\n.method <init> : ()V\n");
     fprintf(out, ".code stack 1 locals 1\n");
     fprintf(out, "    aload_0\n");
     fprintf(out, "    invokespecial Method java/lang/Object <init> ()V\n");
     fprintf(out, "    return\n");
     fprintf(out, ".end code\n");
-    fprintf(out, ".end method\n\n");
+    fprintf(out, ".end method\n");
 }
 
 void emit_java_main(FILE *out, const char *classname) {
-    fprintf(out, ".method public static main : ([Ljava/lang/String;)V\n");
+    fprintf(out, "\n.method public static main : ([Ljava/lang/String;)V\n");
     fprintf(out, ".code stack 1 locals 1\n");
     fprintf(out, "    invokestatic Method %s main ()I\n", classname);
     fprintf(out, "    invokestatic Method java/lang/System exit (I)V\n");
@@ -322,46 +293,36 @@ void emit_java_main(FILE *out, const char *classname) {
     fprintf(out, ".end method\n");
 }
 
-// Collect all global variables from AST
-static void collect_globals(AST *node, const char *classname) {
-    if (!node) return;
-    
-    if (node->kind == AST_DECL && node->decl.name) {
-        // This is a global variable declaration
-        emit_global_field(outputFile, node->decl.name, node->decl.decl_type);
-    }
-    
-    // Continue to next declaration
-    if (node->next) {
-        collect_globals(node->next, classname);
-    }
-}
-
 // Generate code for a single function
-static void generate_function(AST *func, const char *classname) {
+static void generate_function(FILE *out, AST *func, const char *classname) {
     if (!func || func->kind != AST_FUNC) return;
     
     // Generate IR for this function
     IRList ir;
     generate_ir_from_ast(func, &ir);
+
+
+    printf("Printing IR for function %s:\n", func->func.name);
+    ir_print(&ir, stdout); // For debugging
+                           
+                           
     
     // Emit method header
-    emit_method_header(outputFile, classname, func->func.name, 
+    emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);
     
     // Emit bytecode from IR
-    emit_java_from_ir(outputFile, classname, &ir);
+    emit_java_from_ir(out, classname, &ir);
     
-    // Add default return if needed
+    // Add default return if needed (and no explicit return was generated)
     if (func->func.return_type && func->func.return_type->kind == TY_VOID) {
-        fprintf(outputFile, "    return\n");
-    } else if (!ir.tail || (ir.tail->kind != IR_RETURN && ir.tail->kind != IR_RETURN_VOID)) {
-        fprintf(outputFile, "    ldc 0\n");
-        fprintf(outputFile, "    ireturn\n");
+        if (!ir.tail || ir.tail->kind != IR_RETURN_VOID) {
+            fprintf(out, "    return\n");
+        }
     }
     
     // Emit method footer
-    emit_method_footer(outputFile);
+    emit_method_footer(out);
 }
 
 // Main code generation entry point
@@ -387,12 +348,10 @@ void generate_code(AST *program) {
     AST *node = program;
     while (node) {
         if (node->kind == AST_DECL) {
-            collect_globals(node, classname);
+            emit_global_field(outputFile, node->decl.name, node->decl.decl_type);
         }
         node = node->next;
     }
-    
-    fprintf(outputFile, "\n");
     
     // Second pass: emit user-defined functions
     node = program;
@@ -402,7 +361,7 @@ void generate_code(AST *program) {
             if (strcmp(node->func.name, "main") == 0) {
                 has_main = true;
             }
-            generate_function(node, classname);
+            generate_function(outputFile, node, classname);
         }
         node = node->next;
     }
