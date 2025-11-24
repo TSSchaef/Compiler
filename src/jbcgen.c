@@ -18,6 +18,12 @@ static char* get_classname_from_output(const char *filename) {
     return classname;
 }
 
+void codegen_error(const char *msg, AST *node) {
+    fprintf(stderr, "Code generation error in file %s line %d\n\t%s\n", 
+            node->filename,
+            ast_get_line_no(node), msg);
+}
+
 void emit_class_header(FILE *out, const char *classname) {
     fprintf(out, ".class public %s\n", classname);
     fprintf(out, ".super java/lang/Object\n\n");
@@ -303,8 +309,8 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     generate_ir_from_ast(func, &ir);
 
 
-    printf("Printing IR for function %s:\n", func->func.name);
-    ir_print(&ir, stdout); // For debugging
+    // printf("Printing IR for function %s:\n", func->func.name);
+     ir_print(&ir, stdout); // For debugging
                            
                            
     
@@ -332,8 +338,6 @@ static void emit_functions_from_ast(FILE *out, AST *node, const char *classname)
     for (AST *n = node; n != NULL; n = n->next) {
         /* If this node is itself a function, emit it. */
         if (n->kind == AST_FUNC) {
-            fprintf(stderr, "jbcgen: emitting function (direct) '%s'\n",
-                    n->func.name ? n->func.name : "(null)");
             generate_function(out, n, classname);
             continue;
         }
@@ -345,8 +349,6 @@ static void emit_functions_from_ast(FILE *out, AST *node, const char *classname)
 
             for (int i = 0; children[i] != NULL; i++) {
                 if (children[i]->kind == AST_FUNC) {
-                    fprintf(stderr, "jbcgen: emitting function (block child) '%s'\n",
-                            children[i]->func.name ? children[i]->func.name : "(null)");
                     generate_function(out, children[i], classname);
                 } else {
                     /* Do not recurse into function bodies: only want top-level items.*/
@@ -376,12 +378,12 @@ static void emit_functions_from_ast(FILE *out, AST *node, const char *classname)
 // Main code generation entry point
 void generate_code(AST *program) {
     if (!program) {
-        fprintf(stderr, "Code generation error: NULL program AST\n");
+        codegen_error("Code generation error: NULL program AST\n", program);
         return;
     }
     
     if (!outputFile) {
-        fprintf(stderr, "Code generation error: outputFile is NULL\n");
+        codegen_error("Code generation error: outputFile is NULL\n", program);
         return;
     }
     
