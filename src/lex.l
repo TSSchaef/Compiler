@@ -71,6 +71,9 @@
                 case 4:
                     strcat(outputFile, ".types");
                     break;
+                case 5:
+                    strcat(outputFile, ".j");
+                    break;
                 default:
                     strcat(outputFile, ".out");
             }

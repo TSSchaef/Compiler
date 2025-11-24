@@ -60,4 +60,10 @@ Type *type_struct(const char *name, StructMember *members, int member_count);
 StructMember *struct_member_create(const char *name, Type *type);
 StructMember *struct_member_find(Type *struct_type, const char *member_name);
 
+// Initialize standard library functions (ComS 440 standard library)
+void init_stdlib();
+
+// Helper to check if a function is a standard library function
+bool is_stdlib_function(const char *name);
+
 #endif

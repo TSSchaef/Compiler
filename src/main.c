@@ -6,6 +6,9 @@
 #include "ast.h"
 #include "typecheck.h"
 #include "stack.h"
+#include "jbcgen.h"
+
+extern FILE *outputFile;
 
 // For lex and bison
 int yylex(void);
@@ -34,6 +37,11 @@ int main(int argc, char *argv[]){
             }
 
             yyparse();
+
+            if(outputFile){
+                fclose(outputFile);
+            }
+
             break;
 
         case 4:
@@ -48,10 +56,32 @@ int main(int argc, char *argv[]){
 
             ast_free(root_ast);
 
+            if(outputFile){
+                fclose(outputFile);
+            }
+
             break;
 
         case 5:
-            logNotSupported();
+            if(pushFile(argv[2]) != 0){
+               return -1;
+            }
+
+            init_symtab();
+            yyparse();
+
+            //ast_print(root_ast);
+            
+            type_check(root_ast);
+            generate_code(root_ast);
+
+
+            ast_free(root_ast);
+
+            if(outputFile){
+                fclose(outputFile);
+            }
+
             break;
         default:
             logImproperInput();

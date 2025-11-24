@@ -23,8 +23,159 @@ static Scope *new_scope(Scope *parent) {
     return s;
 }
 
+// Helper to create basic types
+static Type *type_int() {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_INT;
+    t->is_const = false;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
+    return t;
+}
+
+static Type *type_float() {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_FLT;
+    t->is_const = false;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
+    return t;
+}
+
+static Type *type_void() {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_VOID;
+    t->is_const = false;
+    t->return_type = NULL;
+    t->array_of = NULL;
+    t->params = NULL;
+    t->param_count = 0;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
+    return t;
+}
+
+static Type *type_char_array() {
+    Type *char_type = malloc(sizeof(Type));
+    char_type->kind = TY_CHAR;
+    char_type->is_const = true; // const char
+    char_type->return_type = NULL;
+    char_type->array_of = NULL;
+    char_type->params = NULL;
+    char_type->param_count = 0;
+    char_type->struct_name = NULL;
+    char_type->members = NULL;
+    char_type->member_count = 0;
+    
+    Type *array_type = malloc(sizeof(Type));
+    array_type->kind = TY_ARRAY;
+    array_type->is_const = false;
+    array_type->return_type = NULL;
+    array_type->array_of = char_type;
+    array_type->params = NULL;
+    array_type->param_count = 0;
+    array_type->struct_name = NULL;
+    array_type->members = NULL;
+    array_type->member_count = 0;
+    
+    return array_type;
+}
+
+static Type *type_function(Type *return_type, Type **params, int param_count) {
+    Type *t = malloc(sizeof(Type));
+    t->kind = TY_FUNC;
+    t->is_const = false;
+    t->return_type = return_type;
+    t->array_of = NULL;
+    t->params = params;
+    t->param_count = param_count;
+    t->struct_name = NULL;
+    t->members = NULL;
+    t->member_count = 0;
+    return t;
+}
+
+void init_stdlib() {
+    if (!current_scope) {
+        fprintf(stderr, "Error: init_stdlib() called before init_symtab()\n");
+        return;
+    }
+    
+    // int getchar()
+    {
+        Type *func_type = type_function(type_int(), NULL, 0);
+        add_symbol("getchar", func_type);
+    }
+    
+    // int putchar(int c)
+    {
+        Type **params = malloc(sizeof(Type *));
+        params[0] = type_int();
+        Type *func_type = type_function(type_int(), params, 1);
+        add_symbol("putchar", func_type);
+    }
+    
+    // int getint()
+    {
+        Type *func_type = type_function(type_int(), NULL, 0);
+        add_symbol("getint", func_type);
+    }
+    
+    // void putint(int x)
+    {
+        Type **params = malloc(sizeof(Type *));
+        params[0] = type_int();
+        Type *func_type = type_function(type_void(), params, 1);
+        add_symbol("putint", func_type);
+    }
+    
+    // float getfloat()
+    {
+        Type *func_type = type_function(type_float(), NULL, 0);
+        add_symbol("getfloat", func_type);
+    }
+    
+    // void putfloat(float x)
+    {
+        Type **params = malloc(sizeof(Type *));
+        params[0] = type_float();
+        Type *func_type = type_function(type_void(), params, 1);
+        add_symbol("putfloat", func_type);
+    }
+    
+    // void putstring(const char s[])
+    {
+        Type **params = malloc(sizeof(Type *));
+        params[0] = type_char_array();
+        Type *func_type = type_function(type_void(), params, 1);
+        add_symbol("putstring", func_type);
+    }
+}
+
+bool is_stdlib_function(const char *name) {
+    return strcmp(name, "getchar") == 0 ||
+           strcmp(name, "putchar") == 0 ||
+           strcmp(name, "getint") == 0 ||
+           strcmp(name, "putint") == 0 ||
+           strcmp(name, "getfloat") == 0 ||
+           strcmp(name, "putfloat") == 0 ||
+           strcmp(name, "putstring") == 0;
+}
+
 void init_symtab() {
     current_scope = new_scope(NULL); // global scope
+    init_stdlib(); // Initialize standard library functions
 }
 
 void enter_scope() {
