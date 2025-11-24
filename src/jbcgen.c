@@ -79,12 +79,23 @@ static void emit_method_signature(FILE *out, const char *classname, const char *
 }
 
 void emit_method_header(FILE *out, const char *classname, const char *name, Type *return_type, AST *params) {
-    emit_method_signature(out, classname, name, return_type, params);
-    fprintf(out, ".limit stack 32\n");
-    fprintf(out, ".limit locals 32\n");
+    fprintf(out, "\n.method public static %s : (", name);
+    
+    // Emit parameter types
+    AST *p = params;
+    while (p) {
+        if (p->kind == AST_DECL) {
+            fprintf(out, "%s", get_type_descriptor(p->decl.decl_type));
+        }
+        p = p->next;
+    }
+    
+    fprintf(out, ")%s\n", get_type_descriptor(return_type));
+    fprintf(out, ".code stack 32 locals 32\n");
 }
 
 void emit_method_footer(FILE *out) {
+    fprintf(out, ".end code\n");
     fprintf(out, ".end method\n\n");
 }
 
@@ -116,7 +127,18 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
             case IR_PUSH_INT:
-                fprintf(out, "    ldc %d\n", p->i);
+                // Use iconst for small constants, ldc for larger ones
+                if (p->i == -1) {
+                    fprintf(out, "    iconst_m1\n");
+                } else if (p->i >= 0 && p->i <= 5) {
+                    fprintf(out, "    iconst_%d\n", p->i);
+                } else if (p->i >= -128 && p->i <= 127) {
+                    fprintf(out, "    bipush %d\n", p->i);
+                } else if (p->i >= -32768 && p->i <= 32767) {
+                    fprintf(out, "    sipush %d\n", p->i);
+                } else {
+                    fprintf(out, "    ldc %d\n", p->i);
+                }
                 break;
                 
             case IR_PUSH_FLOAT:
@@ -125,14 +147,16 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 
             case IR_PUSH_STRING:
                 fprintf(out, "    ldc \"%s\"\n", p->s);
+                // Convert Java string to C char array for lib440
+                fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
             case IR_LOAD_GLOBAL:
-                fprintf(out, "    getstatic %s/%s I\n", classname, p->s);
+                fprintf(out, "    getstatic Field %s %s I\n", classname, p->s);
                 break;
                 
             case IR_STORE_GLOBAL:
-                fprintf(out, "    putstatic %s/%s I\n", classname, p->s);
+                fprintf(out, "    putstatic Field %s %s I\n", classname, p->s);
                 break;
                 
             case IR_LOAD_LOCAL:
@@ -207,23 +231,23 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 if (is_stdlib_function(p->s)) {
                     // Call from lib440 class
                     if (strcmp(p->s, "getchar") == 0) {
-                        fprintf(out, "    invokestatic lib440/getchar()I\n");
+                        fprintf(out, "    invokestatic Method lib440 getchar ()I\n");
                     } else if (strcmp(p->s, "putchar") == 0) {
-                        fprintf(out, "    invokestatic lib440/putchar(I)I\n");
+                        fprintf(out, "    invokestatic Method lib440 putchar (I)I\n");
                     } else if (strcmp(p->s, "getint") == 0) {
-                        fprintf(out, "    invokestatic lib440/getint()I\n");
+                        fprintf(out, "    invokestatic Method lib440 getint ()I\n");
                     } else if (strcmp(p->s, "putint") == 0) {
-                        fprintf(out, "    invokestatic lib440/putint(I)V\n");
+                        fprintf(out, "    invokestatic Method lib440 putint (I)V\n");
                     } else if (strcmp(p->s, "getfloat") == 0) {
-                        fprintf(out, "    invokestatic lib440/getfloat()F\n");
+                        fprintf(out, "    invokestatic Method lib440 getfloat ()F\n");
                     } else if (strcmp(p->s, "putfloat") == 0) {
-                        fprintf(out, "    invokestatic lib440/putfloat(F)V\n");
+                        fprintf(out, "    invokestatic Method lib440 putfloat (F)V\n");
                     } else if (strcmp(p->s, "putstring") == 0) {
-                        fprintf(out, "    invokestatic lib440/putstring([C)V\n");
+                        fprintf(out, "    invokestatic Method lib440 putstring ([C)V\n");
                     }
                 } else {
                     // User-defined function - call from current class
-                    fprintf(out, "    invokestatic %s/%s(", classname, p->s);
+                    fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
                     // Parameter types - simplified, assumes all int
                     for (int i = 0; i < p->i; i++) {
                         fprintf(out, "I");
@@ -279,23 +303,23 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
 }
 
 void emit_init_method(FILE *out, const char *classname) {
-    fprintf(out, ".method public <init>()V\n");
-    fprintf(out, ".limit stack 1\n");
-    fprintf(out, ".limit locals 1\n");
+    fprintf(out, ".method <init> : ()V\n");
+    fprintf(out, ".code stack 1 locals 1\n");
     fprintf(out, "    aload_0\n");
-    fprintf(out, "    invokespecial java/lang/Object/<init>()V\n");
+    fprintf(out, "    invokespecial Method java/lang/Object <init> ()V\n");
     fprintf(out, "    return\n");
+    fprintf(out, ".end code\n");
     fprintf(out, ".end method\n\n");
 }
 
 void emit_java_main(FILE *out, const char *classname) {
-    fprintf(out, ".method public static main([Ljava/lang/String;)V\n");
-    fprintf(out, ".limit stack 1\n");
-    fprintf(out, ".limit locals 1\n");
-    fprintf(out, "    invokestatic %s/main()I\n", classname);
-    fprintf(out, "    invokestatic java/lang/System/exit(I)V\n");
+    fprintf(out, ".method public static main : ([Ljava/lang/String;)V\n");
+    fprintf(out, ".code stack 1 locals 1\n");
+    fprintf(out, "    invokestatic Method %s main ()I\n", classname);
+    fprintf(out, "    invokestatic Method java/lang/System exit (I)V\n");
     fprintf(out, "    return\n");
-    fprintf(out, ".end method\n\n");
+    fprintf(out, ".end code\n");
+    fprintf(out, ".end method\n");
 }
 
 // Collect all global variables from AST
