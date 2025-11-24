@@ -296,6 +296,7 @@ void emit_java_main(FILE *out, const char *classname) {
 // Generate code for a single function
 static void generate_function(FILE *out, AST *func, const char *classname) {
     if (!func || func->kind != AST_FUNC) return;
+
     
     // Generate IR for this function
     IRList ir;
@@ -400,27 +401,17 @@ void generate_code(AST *program) {
         node = node->next;
     }
     
-    // Second pass: emit user-defined functions
-    /*node = program;
-    bool has_main = false;
-    while (node) {
-        if (node->kind == AST_FUNC) {
-            if (strcmp(node->func.name, "main") == 0) {
-                has_main = true;
-            }
-        }
-        node = node->next;
-    }*/
 
     emit_functions_from_ast(outputFile, program, classname);
     
     // Emit special methods
     emit_init_method(outputFile, classname);
     
-    // Emit Java main if C main exists
-    /*if (has_main) {
-        emit_java_main(outputFile, classname);
-    }*/
+
+    //if (strcmp(func->func.name, "main") == 0) {
+    emit_java_main(outputFile, classname);
+        //return;
+    //}
     
     free(classname);
 }
