@@ -139,7 +139,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_PUSH_STRING:
-                fprintf(out, "    ldc \"%s\"\n", p->s);
+                fprintf(out, "    ldc %s\n", p->s);
                 fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
@@ -325,6 +325,53 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     emit_method_footer(out);
 }
 
+static void emit_functions_from_ast(FILE *out, AST *node, const char *classname) {
+    if (!node) return;
+
+    for (AST *n = node; n != NULL; n = n->next) {
+        /* If this node is itself a function, emit it. */
+        if (n->kind == AST_FUNC) {
+            fprintf(stderr, "jbcgen: emitting function (direct) '%s'\n",
+                    n->func.name ? n->func.name : "(null)");
+            generate_function(out, n, classname);
+            continue;
+        }
+
+        /* If this is a BLOCK at top-level, descend into its children. */
+        if (n->kind == AST_BLOCK) {
+            AST **children = NULL;
+            children = n->block.statements; 
+
+            for (int i = 0; children[i] != NULL; i++) {
+                if (children[i]->kind == AST_FUNC) {
+                    fprintf(stderr, "jbcgen: emitting function (block child) '%s'\n",
+                            children[i]->func.name ? children[i]->func.name : "(null)");
+                    generate_function(out, children[i], classname);
+                } else {
+                    /* Do not recurse into function bodies: only want top-level items.*/
+                    if (children[i]->kind == AST_BLOCK) {
+                        emit_functions_from_ast(out, children[i], classname);
+                    }
+                }
+            }
+            continue;
+        }
+
+        /* Sometimes a top-level DECL has an init/value that is a FUNC (function defined as a declaration). 
+        if (n->kind == AST_DECL) {
+            if (n->decl.init && n->decl.init->kind == AST_FUNC) {
+                AST *f = n->decl.init;
+                fprintf(stderr, "jbcgen: emitting function (decl.init) '%s'\n",
+                        f->func.name ? f->func.name : "(null)");
+                generate_function(out, f, classname);
+            }
+            continue;
+        } */
+    }
+}
+
+
+
 // Main code generation entry point
 void generate_code(AST *program) {
     if (!program) {
@@ -354,25 +401,26 @@ void generate_code(AST *program) {
     }
     
     // Second pass: emit user-defined functions
-    node = program;
+    /*node = program;
     bool has_main = false;
     while (node) {
         if (node->kind == AST_FUNC) {
             if (strcmp(node->func.name, "main") == 0) {
                 has_main = true;
             }
-            generate_function(outputFile, node, classname);
         }
         node = node->next;
-    }
+    }*/
+
+    emit_functions_from_ast(outputFile, program, classname);
     
     // Emit special methods
     emit_init_method(outputFile, classname);
     
     // Emit Java main if C main exists
-    if (has_main) {
+    /*if (has_main) {
         emit_java_main(outputFile, classname);
-    }
+    }*/
     
     free(classname);
 }

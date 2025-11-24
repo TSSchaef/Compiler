@@ -6,3 +6,5 @@ img/*
 setup.sh
 *.ppm
 *.hdr
+*.class
+

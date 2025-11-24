@@ -398,7 +398,9 @@ static void gen_stmt(AST *n, IRList *out) {
         case AST_FUNC_CALL:
             gen_expr(n, out);
             // Pop result if not used
-            ir_emit(out, IR_POP, NULL, 0);
+            if(n->type && n->type->kind != TY_VOID && n->func.return_type && n->func.return_type->kind != TY_VOID){
+                ir_emit(out, IR_POP, NULL, 0);
+            }
             break;
             
         case AST_ASSIGN:
