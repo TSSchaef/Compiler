@@ -29,34 +29,6 @@ void emit_class_header(FILE *out, const char *classname) {
     fprintf(out, ".super java/lang/Object\n\n");
 }
 
-void emit_global_field(FILE *out, const char *name, Type *type) {
-    const char *type_desc = "I"; // default to int
-    
-    if (type) {
-        switch(type->kind) {
-            case TY_INT: type_desc = "I"; break;
-            case TY_FLT: type_desc = "F"; break;
-            case TY_CHAR: type_desc = "C"; break;
-            case TY_VOID: type_desc = "V"; break;
-            case TY_ARRAY: 
-                if (type->array_of) {
-                    if (type->array_of->kind == TY_CHAR) type_desc = "[C";
-                    else if (type->array_of->kind == TY_INT) type_desc = "[I";
-                    else if (type->array_of->kind == TY_FLT) type_desc = "[F";
-                    else type_desc = "[I";
-                } else {
-                    type_desc = "[I";
-                }
-                break;
-            case TY_FUNC: type_desc = "I"; break;
-            case TY_STRUCT: type_desc = "Ljava/lang/Object;"; break;
-            default: type_desc = "I"; break;
-        }
-    }
-    
-    fprintf(out, ".field public static %s %s\n", name, type_desc);
-}
-
 static const char* get_type_descriptor(Type *type) {
     if (!type) return "I";
     
@@ -65,17 +37,46 @@ static const char* get_type_descriptor(Type *type) {
         case TY_INT: return "I";
         case TY_FLT: return "F";
         case TY_CHAR: return "C";
-        case TY_ARRAY: 
-            if (type->array_of) {
-                if (type->array_of->kind == TY_CHAR) return "[C";
-                if (type->array_of->kind == TY_INT) return "[I";
-                if (type->array_of->kind == TY_FLT) return "[F";
-            }
-            return "[I";
+        case TY_ARRAY: {
+        // produce leading '[' for each dimension or nested array
+        int dims = 0;
+        Type *elem = type;
+        while (elem && elem->kind == TY_ARRAY) {
+            dims++;
+            elem = elem->array_of;
+        }
+
+        // base descriptor for elem
+        const char *base;
+        if (elem->kind == TY_INT) base = "I";
+        else if (elem->kind == TY_CHAR) base = "C";
+        else if (elem->kind == TY_VOID) base = "V"; // unlikely
+        else /* object/pointer */ base = "Ljava/lang/Object;"; // or real class name
+
+        // build string: e.g. "[[I"
+        size_t len = dims + strlen(base) + 1;
+        char *out = malloc(len);
+        if (!out) exit(1);
+        char *p = out;
+        for (int i=0;i<dims;i++) *p++ = '[';
+        strcpy(p, base);
+        return out;
+    }
+
         case TY_FUNC: return "I";
         case TY_STRUCT: return "Ljava/lang/Object;";
         default: return "I";
     }
+}
+
+void emit_global_field(FILE *out, const char *name, Type *type) {
+    const char *type_desc = "I"; // default to int
+    
+    if (type) {
+        type_desc = get_type_descriptor(type);
+    }
+    
+    fprintf(out, ".field public static %s %s\n", name, type_desc);
 }
 
 void emit_method_header(FILE *out, const char *classname, const char *name, Type *return_type, AST *params) {
@@ -123,6 +124,21 @@ static void emit_comparison(FILE *out, IRKind kind) {
     fprintf(out, "L%d:\n", end_label);
 }
 
+static const char *array_load_opcode(Type *elem) {
+    if (elem->kind == TY_INT)   return "iaload";
+    if (elem->kind == TY_CHAR)  return "caload";
+    if (elem->kind == TY_FLT) return "faload";
+    // reference types
+    return "aaload";
+}
+
+static const char *array_store_opcode(Type *elem) {
+    if (elem->kind == TY_INT)   return "iastore";
+    if (elem->kind == TY_CHAR)  return "castore";
+    if (elem->kind == TY_FLT) return "fastore";
+    return "aastore";
+}
+
 void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
@@ -149,14 +165,28 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
-            case IR_LOAD_GLOBAL:
-                fprintf(out, "    getstatic Field %s %s I\n", classname, p->s);
-                break;
-                
-            case IR_STORE_GLOBAL:
-                fprintf(out, "    putstatic Field %s %s I\n", classname, p->s);
-                break;
-                
+            case IR_LOAD_GLOBAL: {
+                 const char *field_name = p->s ? p->s : "?";
+                 const char *desc = "I"; // default
+
+                 if (p->symbol && p->symbol->type) {
+                     desc = get_type_descriptor(p->symbol->type);
+                 }
+                 fprintf(out, "    getstatic Field %s %s %s\n", classname, field_name, desc);
+                 break;
+             }
+
+            case IR_STORE_GLOBAL: {
+                  const char *field_name = p->s ? p->s : "?";
+                  const char *desc = "I"; // default
+
+                  if (p->symbol && p->symbol->type) {
+                      desc = get_type_descriptor(p->symbol->type);
+                  }
+                  fprintf(out, "    putstatic Field %s %s %s\n", classname, field_name, desc);
+                  break;
+              }
+
             case IR_LOAD_LOCAL:
                 fprintf(out, "    iload_%d\n", p->i);
                 break;
@@ -164,6 +194,18 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             case IR_STORE_LOCAL:
                 fprintf(out, "    istore_%d\n", p->i);
                 break;
+
+            case IR_ARRAY_LOAD: {
+                Type *elem = p->symbol->type->array_of;
+                fprintf(out, "    %s\n", array_load_opcode(elem));  // e.g. "iaload"
+                break;
+            }
+                
+            case IR_ARRAY_STORE: {
+                Type *elem = p->symbol->type->array_of;
+                fprintf(out, "    %s\n", array_store_opcode(elem));  
+                break;
+            }
                 
             case IR_ADD:
                 fprintf(out, "    iadd\n");
@@ -317,14 +359,14 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
 
 
     // printf("Printing IR for function %s:\n", func->func.name);
-     ir_print(&ir, stdout); // For debugging
+    ir_print(&ir, stdout); // For debugging
                            
-                           
-    
+    //printf("Generating function header for %s\n", func->func.name);
     // Emit method header
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);
     
+    //printf("Emiting java for %s\n", func->func.name);
     // Emit bytecode from IR
     emit_java_from_ir(out, classname, &ir);
     
@@ -335,6 +377,7 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
         }
     }
     
+    //printf("Emiting footer for %s\n", func->func.name);
     // Emit method footer
     emit_method_footer(out);
 }

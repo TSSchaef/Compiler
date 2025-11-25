@@ -1,6 +1,12 @@
 #include "ir.h"
 #include "symtab.h"
 
+void ir_error(const char *msg, AST *node) {
+    fprintf(stderr, "Code generation error in file %s line %d\n\t%s\n", 
+            node->filename,
+            ast_get_line_no(node), msg);
+}
+
 void irlist_init(IRList *l) {
     l->head = NULL;
     l->tail = NULL;
@@ -81,6 +87,12 @@ void ir_print(IRList *ir, FILE *out) {
                 break;
             case IR_STORE_GLOBAL:
                 fprintf(out, "STORE_GLOBAL %s\n", p->s ? p->s : "?");
+                break;
+             case IR_ARRAY_LOAD:
+                fprintf(out, "ARRAY_LOAD\n");
+                break;
+            case IR_ARRAY_STORE:
+                fprintf(out, "ARRAY_STORE\n");
                 break;
             case IR_LOAD_LOCAL:
                 fprintf(out, "LOAD_LOCAL %d\n", p->i);
@@ -308,7 +320,7 @@ static void gen_unary(AST *n, IRList *out) {
     }
 }
 
-static void gen_assign(AST *n, IRList *out) {
+static void gen_assign(AST *n, IRList *out, bool need_value) {
     // Handle compound assignment operators
     if (n->assign.op != AOP_ASSIGN) {
         // For compound assignment like +=, we need to load, operate, then store
@@ -344,20 +356,39 @@ static void gen_assign(AST *n, IRList *out) {
             // Store result
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
-                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                if(need_value){
+                    ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                }
             } else {
                 ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
-                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+                if(need_value){
+                    ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+                }
             }
         }
     } else {
         // Simple assignment
-        gen_expr(n->assign.rhs, out);
-        
-        if (n->assign.lhs->kind == AST_ID) {
-            // FIX: Get symbol from the LHS
+        if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
+            gen_expr(n->assign.lhs->array.array, out);   // array ref
+            gen_expr(n->assign.lhs->array.index, out);   // index
+            gen_expr(n->assign.rhs, out);                // value
+
+            if (need_value) {
+                ir_emit(out, IR_DUP, NULL, 0);
+            }
+
+            int elem_kind = 0;
+            if (n->assign.lhs->type) elem_kind = n->assign.lhs->type->kind;
+            ir_emit(out, IR_ARRAY_STORE, NULL, elem_kind);
+
+        } else if (n->assign.lhs->kind == AST_ID) {
+            gen_expr(n->assign.rhs, out);
+
             Symbol *sym = n->assign.lhs->symbol;
-            ir_emit(out, IR_DUP, NULL, 0);
+
+            if(need_value){
+                ir_emit(out, IR_DUP, NULL, 0);
+            }
             
             // Store to local or global
             if (sym && sym->is_local) {
@@ -435,12 +466,22 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
-            gen_assign(n, out);
+            gen_assign(n, out, true);
             break;
             
         case AST_UNARY:
             gen_unary(n, out);
             break;
+
+        case AST_ARRAY_ACCESS: {
+               gen_expr(n->array.array, out);   // Load array reference
+               gen_expr(n->array.index, out);   // Load index
+
+               int elem_kind = 0;
+               if (n->type) elem_kind = n->type->kind;
+               ir_emit(out, IR_ARRAY_LOAD, NULL, elem_kind);
+               break;
+        }
             
         case AST_FUNC_CALL:
             gen_call(n, out);
@@ -458,6 +499,7 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         default:
+            ir_error("Unsupported expression type in code generation", n);
             break;
     }
 }
@@ -490,6 +532,9 @@ static void gen_stmt(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
+            gen_assign(n, out, false);
+            break;  
+
         case AST_UNARY:
             // Expression statements
             gen_expr(n, out);
@@ -497,12 +542,15 @@ static void gen_stmt(AST *n, IRList *out) {
             break;
             
         default:
+            ir_error("Unsupported statement type in code generation", n);
             break;
     }
 }
 
 void generate_ir_from_ast(AST *ast, IRList *out) {
     if (!ast) return;
+
+    //printf("Generating IR from AST node of kind %d\n", ast->kind);
     
     irlist_init(out);
     
@@ -514,4 +562,6 @@ void generate_ir_from_ast(AST *ast, IRList *out) {
     } else {
         gen_stmt(ast, out);
     }
+
+    //printf("Finished generating IR from AST\n");
 }
