@@ -12,6 +12,23 @@ void ir_emit(IRList *l, IRKind k, const char *s, int i) {
     n->s = s;
     n->i = i;
     n->f = 0.0f;
+    n->symbol = NULL;  // Add this
+
+    if (!l->head)
+        l->head = l->tail = n;
+    else {
+        l->tail->next = n;
+        l->tail = n;
+    }
+}
+
+void ir_emit_with_symbol(IRList *l, IRKind k, const char *s, int i, Symbol *sym) {
+    IRInstruction *n = calloc(1, sizeof(*n));
+    n->kind = k;
+    n->s = s;
+    n->i = i;
+    n->f = 0.0f;
+    n->symbol = sym;  // Store the symbol
 
     if (!l->head)
         l->head = l->tail = n;
@@ -27,6 +44,7 @@ void ir_emit_float(IRList *l, IRKind k, float f) {
     n->s = NULL;
     n->i = 0;
     n->f = f;
+    n->symbol = NULL;  // Add this
 
     if (!l->head)
         l->head = l->tail = n;
@@ -232,6 +250,7 @@ static void gen_unary(AST *n, IRList *out) {
         case UOP_POST_INC:
             // For x++: load x, dup if post-inc, push 1, add, store
             if (n->unary.operand->kind == AST_ID) {
+                // FIX: Get symbol from the operand
                 Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_INC) {
                     ir_emit(out, IR_DUP, NULL, 0);
@@ -259,6 +278,7 @@ static void gen_unary(AST *n, IRList *out) {
         case UOP_PRE_DEC:
         case UOP_POST_DEC:
             if (n->unary.operand->kind == AST_ID) {
+                // FIX: Get symbol from the operand
                 Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_DEC) {
                     ir_emit(out, IR_DUP, NULL, 0);
@@ -293,7 +313,10 @@ static void gen_assign(AST *n, IRList *out) {
     if (n->assign.op != AOP_ASSIGN) {
         // For compound assignment like +=, we need to load, operate, then store
         if (n->assign.lhs->kind == AST_ID) {
+            // FIX: Get symbol from the LHS, not from the assignment node
             Symbol *sym = n->assign.lhs->symbol;
+
+            //printf("Generating compound assignment for identifier: %s, is_local: %d\n", n->assign.lhs->id, n->assign.lhs->symbol->is_local);
             
             // Load current value
             if (sym && sym->is_local) {
@@ -332,9 +355,10 @@ static void gen_assign(AST *n, IRList *out) {
         gen_expr(n->assign.rhs, out);
         
         if (n->assign.lhs->kind == AST_ID) {
+            // FIX: Get symbol from the LHS
             Symbol *sym = n->assign.lhs->symbol;
             ir_emit(out, IR_DUP, NULL, 0);
-
+            
             // Store to local or global
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
@@ -353,14 +377,17 @@ static void gen_call(AST *n, IRList *out) {
         arg = arg->next;
     }
     
-    // Get function name
+    // Get function name and symbol
     const char *func_name = NULL;
+    Symbol *func_symbol = NULL;
+    
     if (n->call.callee->kind == AST_ID) {
         func_name = n->call.callee->id;
+        func_symbol = n->call.callee->symbol;  // Get the symbol from the callee
     }
     
     if (func_name) {
-        ir_emit(out, IR_CALL, func_name, n->call.arg_count);
+        ir_emit_with_symbol(out, IR_CALL, func_name, n->call.arg_count, func_symbol);
     }
 }
 

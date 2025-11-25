@@ -57,6 +57,7 @@ typedef struct IRInstruction {
     const char *s;  // optional symbol (variable name, function name, etc.)
     int i;          // optional integer literal or local variable index
     float f;        // optional float literal
+    struct Symbol *symbol;
     struct IRInstruction *next;
 } IRInstruction;
 
@@ -67,6 +68,7 @@ typedef struct {
 
 void irlist_init(IRList *l);
 void ir_emit(IRList *l, IRKind k, const char *s, int i);
+void ir_emit_with_symbol(IRList *l, IRKind k, const char *s, int i, Symbol *sym);
 void ir_emit_float(IRList *l, IRKind k, float f);
 
 void generate_ir_from_ast(AST *ast, IRList *out);

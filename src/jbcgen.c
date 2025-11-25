@@ -241,14 +241,21 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                         fprintf(out, "    invokestatic Method lib440 putstring ([C)V\n");
                     }
                 } else {
+                    // User-defined function - get return type from symbol
+                    const char *return_desc = "I"; // default to int
+                    
+                    if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FUNC) {
+                        return_desc = get_type_descriptor(p->symbol->type->return_type);
+                    }
+                    
                     fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
                     for (int i = 0; i < p->i; i++) {
                         fprintf(out, "I");
                     }
-                    fprintf(out, ")I\n");
+                    fprintf(out, ")%s\n", return_desc);
                 }
-                break;
-                
+                break;  
+
             case IR_RETURN:
                 fprintf(out, "    ireturn\n");
                 break;
@@ -336,54 +343,44 @@ static void emit_functions_from_ast(FILE *out, AST *node, const char *classname)
     if (!node) return;
 
     for (AST *n = node; n != NULL; n = n->next) {
-        /* If this node is itself a function, emit it. */
         if (n->kind == AST_FUNC) {
+            // This is a function definition
             generate_function(out, n, classname);
-            continue;
-        }
-
-        /* If this is a BLOCK at top-level, descend into its children. */
-        if (n->kind == AST_BLOCK) {
-            AST **children = NULL;
-            children = n->block.statements; 
-
-            for (int i = 0; children[i] != NULL; i++) {
-                if (children[i]->kind == AST_FUNC) {
-                    generate_function(out, children[i], classname);
-                } else {
-                    /* Do not recurse into function bodies: only want top-level items.*/
-                    if (children[i]->kind == AST_BLOCK) {
-                        emit_functions_from_ast(out, children[i], classname);
-                    }
-                }
+        } else if (n->kind == AST_BLOCK) {
+            // Recursively process blocks to find functions
+            for (int i = 0; i < n->block.count; i++) {
+                emit_functions_from_ast(out, n->block.statements[i], classname);
             }
-            continue;
         }
-
-        /* Sometimes a top-level DECL has an init/value that is a FUNC (function defined as a declaration). 
-        if (n->kind == AST_DECL) {
-            if (n->decl.init && n->decl.init->kind == AST_FUNC) {
-                AST *f = n->decl.init;
-                fprintf(stderr, "jbcgen: emitting function (decl.init) '%s'\n",
-                        f->func.name ? f->func.name : "(null)");
-                generate_function(out, f, classname);
-            }
-            continue;
-        } */
+        // Skip other top-level nodes (declarations, etc.)
     }
 }
 
-
+// Helper function to collect global variables from AST
+static void emit_globals_from_ast(FILE *out, AST *node) {
+    if (!node) return;
+    
+    for (AST *n = node; n != NULL; n = n->next) {
+        if (n->kind == AST_DECL) {
+            emit_global_field(out, n->decl.name, n->decl.decl_type);
+        } else if (n->kind == AST_BLOCK) {
+            // Recursively process blocks
+            for (int i = 0; i < n->block.count; i++) {
+                emit_globals_from_ast(out, n->block.statements[i]);
+            }
+        }
+    }
+}
 
 // Main code generation entry point
 void generate_code(AST *program) {
     if (!program) {
-        codegen_error("Code generation error: NULL program AST\n", program);
+        fprintf(stderr, "Code generation error: NULL program AST\n");
         return;
     }
     
     if (!outputFile) {
-        codegen_error("Code generation error: outputFile is NULL\n", program);
+        fprintf(stderr, "Code generation error: outputFile is NULL\n");
         return;
     }
     
@@ -395,25 +392,14 @@ void generate_code(AST *program) {
     emit_class_header(outputFile, classname);
     
     // First pass: collect and emit global variables
-    AST *node = program;
-    while (node) {
-        if (node->kind == AST_DECL) {
-            emit_global_field(outputFile, node->decl.name, node->decl.decl_type);
-        }
-        node = node->next;
-    }
+    emit_globals_from_ast(outputFile, program);
     
-
+    // Second pass: emit functions
     emit_functions_from_ast(outputFile, program, classname);
     
     // Emit special methods
     emit_init_method(outputFile, classname);
-    
-
-    //if (strcmp(func->func.name, "main") == 0) {
     emit_java_main(outputFile, classname);
-        //return;
-    //}
     
     free(classname);
 }

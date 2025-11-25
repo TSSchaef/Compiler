@@ -227,12 +227,13 @@ void exit_scope() {
     current_scope = parent;
 }
 
-// NEW: Check if we're in global scope
+// We need the double parent step up because the AST is wrapped
+// in a block at the top level that adds an extra scope.
 bool is_global_scope() {
-    return current_scope && current_scope->parent == NULL;
+    return current_scope && current_scope->parent &&
+        current_scope->parent->parent == NULL;
 }
 
-// NEW: Get the current local variable count
 int get_local_count() {
     if (!current_scope) return 0;
     return current_scope->local_count;
@@ -261,6 +262,8 @@ bool add_symbol(const char *name, Type *type) {
     new_sym->next = table[idx];
 
     new_sym->is_local = !is_global_scope() && !is_func;
+
+    //printf("Adding symbol: %s, is_func=%d, is_local=%d\n", name, is_func, new_sym->is_local);
     
     if (new_sym->is_local) {
         new_sym->local_index = current_scope->local_count++;
