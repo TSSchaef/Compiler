@@ -5,6 +5,7 @@ AST *ast_alloc() {
     memset(n, 0, sizeof(AST));
     n->type = NULL;
     n->next = NULL;
+    n->symbol = NULL;
     n->filename = strdup(getCurrentFileName());
     return n;
 }
@@ -674,6 +675,10 @@ void ast_free(AST *node) {
 
         case AST_ID:
             free(node->id);
+            if(node->symbol){
+                free(node->symbol->name);
+                free(node->symbol);
+            }
             free(node);
             break;
 
@@ -728,6 +733,10 @@ void ast_free(AST *node) {
                 ast_free(p);
                 p = next;
             }
+            if(node->symbol){
+                free(node->symbol->name);
+                free(node->symbol);
+            }
             if (node->func.body) ast_free(node->func.body);
             free(node);
             break;
@@ -766,6 +775,10 @@ void ast_free(AST *node) {
                 AST *next = m->next;
                 ast_free(m);
                 m = next;
+            }
+            if(node->symbol){
+                free(node->symbol->name);
+                free(node->symbol);
             }
             free(node);
             break;

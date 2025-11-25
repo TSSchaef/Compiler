@@ -20,6 +20,7 @@ static Scope *new_scope(Scope *parent) {
     s->func_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->struct_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->parent = parent;
+    s->local_count = 0;  // NEW: initialize local count
     return s;
 }
 
@@ -226,6 +227,17 @@ void exit_scope() {
     current_scope = parent;
 }
 
+// NEW: Check if we're in global scope
+bool is_global_scope() {
+    return current_scope && current_scope->parent == NULL;
+}
+
+// NEW: Get the current local variable count
+int get_local_count() {
+    if (!current_scope) return 0;
+    return current_scope->local_count;
+}
+
 bool add_symbol(const char *name, Type *type) {
     if (!current_scope) init_symtab();
 
@@ -247,6 +259,14 @@ bool add_symbol(const char *name, Type *type) {
     new_sym->name = strdup(name);
     new_sym->type = type;
     new_sym->next = table[idx];
+
+    new_sym->is_local = !is_global_scope() && !is_func;
+    
+    if (new_sym->is_local) {
+        new_sym->local_index = current_scope->local_count++;
+    } else {
+        new_sym->local_index = -1;
+    }
 
     table[idx] = new_sym;
     return true;
@@ -318,6 +338,8 @@ bool add_struct(const char *name, Type *struct_type) {
     Symbol *new_sym = malloc(sizeof(Symbol));
     new_sym->name = strdup(name);
     new_sym->type = struct_type;
+    new_sym->is_local = false;  // NEW: structs are not local variables
+    new_sym->local_index = -1;  // NEW: no local index for structs
     new_sym->next = current_scope->struct_table[idx];
     
     current_scope->struct_table[idx] = new_sym;
@@ -389,3 +411,15 @@ StructMember *struct_member_find(Type *struct_type, const char *member_name) {
     
     return NULL;
 }
+
+Symbol *copy_symbol(const Symbol *sym){
+    if(!sym) return NULL;
+    Symbol *new_sym = malloc(sizeof(Symbol));
+    new_sym->name = strdup(sym->name);
+    new_sym->type = sym->type; // shallow copy of type
+    new_sym->is_local = sym->is_local;
+    new_sym->local_index = sym->local_index;
+
+    return new_sym;
+}
+

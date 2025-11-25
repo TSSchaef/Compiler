@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "symtab.h"
 
 void irlist_init(IRList *l) {
     l->head = NULL;
@@ -76,7 +77,7 @@ void ir_print(IRList *ir, FILE *out) {
                 fprintf(out, "PUSH_FLOAT %f\n", p->f);
                 break;
             case IR_PUSH_STRING:
-                fprintf(out, "PUSH_STRING \"%s\"\n", p->s ? p->s : "");
+                fprintf(out, "PUSH_STRING %s\n", p->s ? p->s : "");
                 break;
             case IR_ADD:
                 fprintf(out, "ADD\n");
@@ -231,28 +232,54 @@ static void gen_unary(AST *n, IRList *out) {
         case UOP_POST_INC:
             // For x++: load x, dup if post-inc, push 1, add, store
             if (n->unary.operand->kind == AST_ID) {
+                Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_INC) {
                     ir_emit(out, IR_DUP, NULL, 0);
                 }
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
                 ir_emit(out, IR_ADD, NULL, 0);
-                ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                
+                // Use local or global store based on symbol
+                if (sym && sym->is_local) {
+                    ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                } else {
+                    ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                }
+                
                 if (n->unary.op == UOP_PRE_INC) {
-                    ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                    // Load the new value back for pre-increment
+                    if (sym && sym->is_local) {
+                        ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                    } else {
+                        ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                    }
                 }
             }
             break;
         case UOP_PRE_DEC:
         case UOP_POST_DEC:
             if (n->unary.operand->kind == AST_ID) {
+                Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_DEC) {
                     ir_emit(out, IR_DUP, NULL, 0);
                 }
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
                 ir_emit(out, IR_SUB, NULL, 0);
-                ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                
+                // Use local or global store based on symbol
+                if (sym && sym->is_local) {
+                    ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                } else {
+                    ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                }
+                
                 if (n->unary.op == UOP_PRE_DEC) {
-                    ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                    // Load the new value back for pre-decrement
+                    if (sym && sym->is_local) {
+                        ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                    } else {
+                        ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                    }
                 }
             }
             break;
@@ -266,7 +293,15 @@ static void gen_assign(AST *n, IRList *out) {
     if (n->assign.op != AOP_ASSIGN) {
         // For compound assignment like +=, we need to load, operate, then store
         if (n->assign.lhs->kind == AST_ID) {
-            ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+            Symbol *sym = n->assign.lhs->symbol;
+            
+            // Load current value
+            if (sym && sym->is_local) {
+                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+            } else {
+                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+            }
+            
             gen_expr(n->assign.rhs, out);
             
             switch(n->assign.op) {
@@ -283,16 +318,29 @@ static void gen_assign(AST *n, IRList *out) {
                 default: break;
             }
             
-            ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
-            ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+            // Store result
+            if (sym && sym->is_local) {
+                ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+            } else {
+                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+            }
         }
     } else {
         // Simple assignment
         gen_expr(n->assign.rhs, out);
         
         if (n->assign.lhs->kind == AST_ID) {
+            Symbol *sym = n->assign.lhs->symbol;
             ir_emit(out, IR_DUP, NULL, 0);
-            ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+
+            // Store to local or global
+            if (sym && sym->is_local) {
+                ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+            } else {
+                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+            }
         }
     }
 }
@@ -340,9 +388,20 @@ static void gen_expr(AST *n, IRList *out) {
             ir_emit(out, IR_PUSH_INT, NULL, n->boolval ? 1 : 0);
             break;
             
-        case AST_ID:
-            ir_emit(out, IR_LOAD_GLOBAL, n->id, 0);
+        case AST_ID: {
+            Symbol *sym = n->symbol;
+
+            //printf("Generating load for identifier: %s\n", n->id);
+            //printf("Symbol info: is_local=%d, local_index=%d\n", sym->is_local, sym->local_index);
+
+            if (sym && sym->is_local) {
+                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+            } else {
+                // printf("!!!! Loading global variable: %s\n", n->id);
+                ir_emit(out, IR_LOAD_GLOBAL, n->id, 0);
+            }
             break;
+        }
             
         case AST_BINOP:
             gen_binop(n, out);

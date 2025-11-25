@@ -103,6 +103,8 @@ typedef struct AST {
     ASTKind kind;
     struct Type *type;        // Set later by type checker
 
+    struct Symbol *symbol;    
+
     /* generic next pointer used to build lists (top-level, stmt lists, params) */
     struct AST *next;
 

@@ -30,6 +30,8 @@ struct StructMember {
 typedef struct Symbol {
     char *name;
     Type *type;
+    bool is_local;              
+    int local_index;            
     struct Symbol *next;
 } Symbol;
 
@@ -38,6 +40,7 @@ typedef struct Scope {
     Symbol **func_table;     // Separate table for functions
     Symbol **struct_table;   // Separate table for struct definitions
     int bucket_count;
+    int local_count;         // NEW: number of local variables in this scope
     struct Scope *parent;
 } Scope;
 
@@ -49,6 +52,11 @@ void exit_scope();          // call on block/function exit
 bool add_symbol(const char *name, Type *type);
 Symbol *lookup_symbol(const char *name);           // search current + ancestors
 Symbol *lookup_symbol_current(const char *name);   // search only current scope
+
+Symbol *copy_symbol(const Symbol *sym); // deep copy of a symbol
+
+bool is_global_scope();
+int get_local_count();
 
 // Struct-specific functions
 bool add_struct(const char *name, Type *struct_type);

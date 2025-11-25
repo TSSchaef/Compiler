@@ -357,6 +357,7 @@ static void type_check_node(AST *node) {
             node->type = NULL;
         } else {
             node->type = s->type;
+            node->symbol = copy_symbol(s);
         }
         break;
     }
@@ -819,13 +820,16 @@ static void type_check_node(AST *node) {
                     "Redeclaration of variable '%s'", node->decl.name);
             error(buf, node);
         }
+
         if(node->decl.decl_type->kind == TY_VOID){
             char buf[256];
             snprintf(buf, sizeof(buf), 
                     "Variable '%s' declared void", node->decl.name);
             error(buf, node);
         }
+
         node->type = node->decl.decl_type;
+        node->symbol = copy_symbol(lookup_symbol(node->decl.name));
         break;
 
     case AST_STRUCT_DEF: {
@@ -892,6 +896,7 @@ static void type_check_node(AST *node) {
            // Count parameters
            for (AST *p = param; p; p = p->next) {
                param_count++;
+               p->symbol = copy_symbol(lookup_symbol(p->decl.name));  
            }
 
            if (param_count > 0) {
@@ -912,9 +917,9 @@ static void type_check_node(AST *node) {
                error(buf, node);
            }
 
-           enter_scope();
+           enter_scope();  // Enter function scope
 
-           // Add parameters to scope
+           // Add parameters to function scope (they are local variables)
            for (AST *p = param; p; p = p->next) {
                // Check if parameter is a struct type
                if (p->decl.decl_type && p->decl.decl_type->kind == TY_STRUCT) {
@@ -927,7 +932,7 @@ static void type_check_node(AST *node) {
                        error(buf, node);
                    }
                }
-               
+
                if(!add_symbol(p->decl.name, p->decl.decl_type)){
                    char buf[256];
                    snprintf(buf, sizeof(buf), 
@@ -954,11 +959,12 @@ static void type_check_node(AST *node) {
            // Restore previous return type (for nested functions if you support them)
            current_function_return_type = prev_return_type;
 
-           exit_scope();
+           exit_scope();  // Exit function scope
 
            node->type = ft;
            break;
-        }
+                   }
+
 
      case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
