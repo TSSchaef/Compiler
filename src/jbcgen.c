@@ -65,7 +65,6 @@ static const char* get_type_descriptor(Type *type) {
         case TY_INT: return "I";
         case TY_FLT: return "F";
         case TY_CHAR: return "C";
-<<<<<<< HEAD
         case TY_ARRAY: {
             // produce leading '[' for each dimension or nested array
             int dims = 0;
@@ -93,15 +92,6 @@ static const char* get_type_descriptor(Type *type) {
             return out;
         }
 
-=======
-        case TY_ARRAY: 
-            if (type->array_of) {
-                if (type->array_of->kind == TY_CHAR) return "[C";
-                if (type->array_of->kind == TY_INT) return "[I";
-                if (type->array_of->kind == TY_FLT) return "[F";
-            }
-            return "[I";
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
         case TY_FUNC: return "I";
         case TY_STRUCT: return "Ljava/lang/Object;";
         default: return "I";
@@ -153,45 +143,50 @@ static void emit_comparison(FILE *out, IRKind kind) {
     fprintf(out, "L%d:\n", end_label);
 }
 
-<<<<<<< HEAD
+// Helper functions for array operations
 static const char *array_load_opcode(Type *array_type) {
-    // array_type should be the array type itself, not the element
     if (!array_type || array_type->kind != TY_ARRAY) {
-        return "iaload"; // default fallback
+        return "iaload";
     }
     
     Type *elem = array_type->array_of;
     if (!elem) {
-        return "iaload"; // default fallback
+        return "iaload";
     }
     
     if (elem->kind == TY_INT)   return "iaload";
     if (elem->kind == TY_CHAR)  return "caload";
     if (elem->kind == TY_FLT)   return "faload";
-    // reference types (arrays, structs)
     return "aaload";
 }
 
 static const char *array_store_opcode(Type *array_type) {
-    // array_type should be the array type itself, not the element
     if (!array_type || array_type->kind != TY_ARRAY) {
-        return "iastore"; // default fallback
+        return "iastore";
     }
     
     Type *elem = array_type->array_of;
     if (!elem) {
-        return "iastore"; // default fallback
+        return "iastore";
     }
     
     if (elem->kind == TY_INT)   return "iastore";
     if (elem->kind == TY_CHAR)  return "castore";
     if (elem->kind == TY_FLT)   return "fastore";
-    // reference types
     return "aastore";
 }
 
-=======
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
+static const char *newarray_type(Type *elem_type) {
+    if (!elem_type) return "int";
+    
+    switch (elem_type->kind) {
+        case TY_INT: return "int";
+        case TY_CHAR: return "char";
+        case TY_FLT: return "float";
+        default: return "int";
+    }
+}
+
 void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
@@ -233,24 +228,29 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             case IR_STORE_LOCAL:
                 fprintf(out, "    istore_%d\n", p->i);
                 break;
-<<<<<<< HEAD
 
-            case IR_ARRAY_LOAD: {
-                // Get array type from symbol
+                case IR_ARRAY_LOAD: {
                 Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
                 fprintf(out, "    %s\n", array_load_opcode(array_type));
                 break;
             }
                 
             case IR_ARRAY_STORE: {
-                // Get array type from symbol
                 Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
                 fprintf(out, "    %s\n", array_store_opcode(array_type));
                 break;
             }
-=======
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
-                
+            
+            case IR_ALLOC_ARRAY: {
+                // Stack already has the size on top
+                Type *elem_type = NULL;
+                if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_ARRAY) {
+                    elem_type = p->symbol->type->array_of;
+                }
+                fprintf(out, "    newarray %s\n", newarray_type(elem_type));
+                break;
+            }
+
             case IR_ADD:
                 fprintf(out, "    iadd\n");
                 break;
@@ -477,15 +477,11 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     IRList ir;
     generate_ir_from_ast(func, &ir);
 
-<<<<<<< HEAD
-=======
 
     // printf("Printing IR for function %s:\n", func->func.name);
      ir_print(&ir, stdout); // For debugging
                            
                            
-    
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
     // Emit method header
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);

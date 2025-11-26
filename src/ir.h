@@ -50,6 +50,9 @@ typedef enum {
     IR_CAST_D2I,
     IR_CAST_F2D,
     IR_CAST_D2F,
+    IR_ARRAY_LOAD,      // NEW: Load value from array
+    IR_ARRAY_STORE,     // NEW: Store value to array
+    IR_ALLOC_ARRAY,     // NEW: Allocate array
 } IRKind;
 
 typedef struct IRInstruction {
@@ -74,5 +77,8 @@ void ir_emit_float(IRList *l, IRKind k, float f);
 void generate_ir_from_ast(AST *ast, IRList *out);
 
 void ir_print(IRList *ir, FILE *out);
+
+// Generate IR for local declarations
+void gen_decl(AST *n, IRList *out);
 
 #endif

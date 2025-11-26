@@ -12,7 +12,7 @@ void ir_emit(IRList *l, IRKind k, const char *s, int i) {
     n->s = s;
     n->i = i;
     n->f = 0.0f;
-    n->symbol = NULL;  // Add this
+    n->symbol = NULL;
 
     if (!l->head)
         l->head = l->tail = n;
@@ -28,7 +28,7 @@ void ir_emit_with_symbol(IRList *l, IRKind k, const char *s, int i, Symbol *sym)
     n->s = s;
     n->i = i;
     n->f = 0.0f;
-    n->symbol = sym;  // Store the symbol
+    n->symbol = sym;
 
     if (!l->head)
         l->head = l->tail = n;
@@ -44,7 +44,7 @@ void ir_emit_float(IRList *l, IRKind k, float f) {
     n->s = NULL;
     n->i = 0;
     n->f = f;
-    n->symbol = NULL;  // Add this
+    n->symbol = NULL;
 
     if (!l->head)
         l->head = l->tail = n;
@@ -184,6 +184,15 @@ void ir_print(IRList *ir, FILE *out) {
             case IR_CAST_D2F:
                 fprintf(out, "CAST_D2F\n");
                 break;
+            case IR_ARRAY_LOAD:
+                fprintf(out, "ARRAY_LOAD\n");
+                break;
+            case IR_ARRAY_STORE:
+                fprintf(out, "ARRAY_STORE\n");
+                break;
+            case IR_ALLOC_ARRAY:
+                fprintf(out, "ALLOC_ARRAY size=%d\n", p->i);
+                break;
             default:
                 fprintf(out, "UNKNOWN(%d)\n", p->kind);
                 break;
@@ -250,7 +259,6 @@ static void gen_unary(AST *n, IRList *out) {
         case UOP_POST_INC:
             // For x++: load x, dup if post-inc, push 1, add, store
             if (n->unary.operand->kind == AST_ID) {
-                // FIX: Get symbol from the operand
                 Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_INC) {
                     ir_emit(out, IR_DUP, NULL, 0);
@@ -258,7 +266,6 @@ static void gen_unary(AST *n, IRList *out) {
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
                 ir_emit(out, IR_ADD, NULL, 0);
                 
-                // Use local or global store based on symbol
                 if (sym && sym->is_local) {
                     ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
                 } else {
@@ -266,7 +273,6 @@ static void gen_unary(AST *n, IRList *out) {
                 }
                 
                 if (n->unary.op == UOP_PRE_INC) {
-                    // Load the new value back for pre-increment
                     if (sym && sym->is_local) {
                         ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
                     } else {
@@ -278,7 +284,6 @@ static void gen_unary(AST *n, IRList *out) {
         case UOP_PRE_DEC:
         case UOP_POST_DEC:
             if (n->unary.operand->kind == AST_ID) {
-                // FIX: Get symbol from the operand
                 Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_DEC) {
                     ir_emit(out, IR_DUP, NULL, 0);
@@ -286,7 +291,6 @@ static void gen_unary(AST *n, IRList *out) {
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
                 ir_emit(out, IR_SUB, NULL, 0);
                 
-                // Use local or global store based on symbol
                 if (sym && sym->is_local) {
                     ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
                 } else {
@@ -294,7 +298,6 @@ static void gen_unary(AST *n, IRList *out) {
                 }
                 
                 if (n->unary.op == UOP_PRE_DEC) {
-                    // Load the new value back for pre-decrement
                     if (sym && sym->is_local) {
                         ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
                     } else {
@@ -311,11 +314,9 @@ static void gen_unary(AST *n, IRList *out) {
 static void gen_assign(AST *n, IRList *out) {
     // Handle compound assignment operators
     if (n->assign.op != AOP_ASSIGN) {
-        // For compound assignment like +=, we need to load, operate, then store
         if (n->assign.lhs->kind == AST_ID) {
             Symbol *sym = n->assign.lhs->symbol;
             
-            // Load current value
             if (sym && sym->is_local) {
                 ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
             } else {
@@ -338,76 +339,28 @@ static void gen_assign(AST *n, IRList *out) {
                 default: break;
             }
             
-            // Store result
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
                 ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
             } else {
-<<<<<<< HEAD
                 ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0, sym);
-                if(need_value){
-                    ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0, sym);
-                }
-=======
-                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
-                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
+                ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0, sym);
             }
         }
     } else {
         // Simple assignment
-<<<<<<< HEAD
         if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
-            // For array[index] = value:
-            // Stack needs to be: array, index, value (in that order for iastore)
+            gen_expr(n->assign.lhs->array.array, out);
+            gen_expr(n->assign.lhs->array.index, out);
+            gen_expr(n->assign.rhs, out);
             
-            gen_expr(n->assign.lhs->array.array, out);   // array ref
-            gen_expr(n->assign.lhs->array.index, out);   // index
-            gen_expr(n->assign.rhs, out);                // value
-            
-            // If we need the value (for chained assignment), we need to duplicate it
-            // BEFORE the store, but the stack order for iastore is: array, index, value
-            // So we need: array, index, value, value (with dup_x2 to get value below array/index)
-            if (need_value) {
-                // Stack: array, index, value
-                // We want: value, array, index, value (so after iastore, value remains)
-                // Use dup_x2: duplicates top value and inserts it 2 slots down
-                // This gives us: array, value, index, value
-                // That's not quite right... we need a different approach
-                
-                // Better approach: dup, then swap to get the right order
-                // Actually, for iastore we need: arrayref, index, value
-                // To keep value after store, we do: arrayref, index, value, value
-                // Then rotate: arrayref, value, index, value
-                // No, simpler: just dup BEFORE generating the whole sequence
-                
-                // Actually the right way: evaluate RHS first when chained
-                // This is getting complex - let's restructure
-            }
-
             Symbol *array_sym = n->assign.lhs->array.array->symbol;
             ir_emit_with_symbol(out, IR_ARRAY_STORE, NULL, 0, array_sym);
-            
-            if (need_value) {
-                // After store, reload the value we just stored
-                gen_expr(n->assign.lhs->array.array, out);
-                gen_expr(n->assign.lhs->array.index, out);
-                ir_emit_with_symbol(out, IR_ARRAY_LOAD, NULL, 0, array_sym);
-            }
-
         } else if (n->assign.lhs->kind == AST_ID) {
             gen_expr(n->assign.rhs, out);
-
-=======
-        gen_expr(n->assign.rhs, out);
-        
-        if (n->assign.lhs->kind == AST_ID) {
-            // FIX: Get symbol from the LHS
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
             Symbol *sym = n->assign.lhs->symbol;
             ir_emit(out, IR_DUP, NULL, 0);
             
-            // Store to local or global
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
             } else {
@@ -418,20 +371,18 @@ static void gen_assign(AST *n, IRList *out) {
 }
 
 static void gen_call(AST *n, IRList *out) {
-    // Generate code for each argument
     AST *arg = n->call.args;
     while (arg) {
         gen_expr(arg, out);
         arg = arg->next;
     }
     
-    // Get function name and symbol
     const char *func_name = NULL;
     Symbol *func_symbol = NULL;
     
     if (n->call.callee->kind == AST_ID) {
         func_name = n->call.callee->id;
-        func_symbol = n->call.callee->symbol;  // Get the symbol from the callee
+        func_symbol = n->call.callee->symbol;
     }
     
     if (func_name) {
@@ -469,7 +420,6 @@ static void gen_expr(AST *n, IRList *out) {
             if (sym && sym->is_local) {
                 ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
             } else {
-                // Pass symbol for global variables so we can get the correct type descriptor
                 ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->id, 0, sym);
             }
             break;
@@ -486,19 +436,15 @@ static void gen_expr(AST *n, IRList *out) {
         case AST_UNARY:
             gen_unary(n, out);
             break;
-<<<<<<< HEAD
-
+            
         case AST_ARRAY_ACCESS: {
-            gen_expr(n->array.array, out);   // Load array reference
-            gen_expr(n->array.index, out);   // Load index
-
-            // FIX: Pass the array's symbol so jbcgen can get the element type
+            gen_expr(n->array.array, out);
+            gen_expr(n->array.index, out);
+            
             Symbol *array_sym = n->array.array->symbol;
             ir_emit_with_symbol(out, IR_ARRAY_LOAD, NULL, 0, array_sym);
             break;
         }
-=======
->>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
             
         case AST_FUNC_CALL:
             gen_call(n, out);
@@ -506,7 +452,6 @@ static void gen_expr(AST *n, IRList *out) {
             
         case AST_LOGICAL_OR:
         case AST_LOGICAL_AND:
-            // For phase 5, we'll generate simple (non-short-circuit) code
             gen_expr(n->logical.left, out);
             gen_expr(n->logical.right, out);
             if (n->kind == AST_LOGICAL_OR)
@@ -520,10 +465,48 @@ static void gen_expr(AST *n, IRList *out) {
     }
 }
 
+// NEW: Handle local variable declarations
+void gen_decl(AST *n, IRList *out) {
+    if (!n || n->kind != AST_DECL) return;
+    
+    // If this is an array declaration, allocate it
+    if (n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
+        Symbol *sym = n->symbol;
+        
+        // For local arrays, we need to allocate and store
+        if (sym && sym->is_local) {
+            // Push array size (you may need to track this in your Type structure)
+            // For now, using a default size of 10
+            ir_emit(out, IR_PUSH_INT, NULL, 10);
+            ir_emit_with_symbol(out, IR_ALLOC_ARRAY, n->decl.name, 0, sym);
+            ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+        }
+    }
+    
+    // If there's an initializer, generate code for it
+    if (n->decl.init) {
+        gen_expr(n->decl.init, out);
+        
+        Symbol *sym = n->symbol;
+        if (sym && sym->is_local) {
+            ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+        } else {
+            ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->decl.name, 0, sym);
+        }
+        
+        // Pop the value since declaration statements don't produce values
+        ir_emit(out, IR_POP, NULL, 0);
+    }
+}
+
 static void gen_stmt(AST *n, IRList *out) {
     if (!n) return;
     
     switch(n->kind) {
+        case AST_DECL:
+            gen_decl(n, out);
+            break;
+            
         case AST_RETURN:
             if (n->ret.expr) {
                 gen_expr(n->ret.expr, out);
@@ -541,7 +524,6 @@ static void gen_stmt(AST *n, IRList *out) {
             
         case AST_FUNC_CALL:
             gen_expr(n, out);
-            // Pop result if not used
             if(n->type && n->type->kind != TY_VOID && n->func.return_type && n->func.return_type->kind != TY_VOID){
                 ir_emit(out, IR_POP, NULL, 0);
             }
@@ -549,7 +531,6 @@ static void gen_stmt(AST *n, IRList *out) {
             
         case AST_ASSIGN:
         case AST_UNARY:
-            // Expression statements
             gen_expr(n, out);
             ir_emit(out, IR_POP, NULL, 0);
             break;
@@ -565,7 +546,6 @@ void generate_ir_from_ast(AST *ast, IRList *out) {
     irlist_init(out);
     
     if (ast->kind == AST_FUNC) {
-        // Generate IR for function body
         if (ast->func.body) {
             gen_stmt(ast->func.body, out);
         }
