@@ -1,12 +1,6 @@
 #include "ir.h"
 #include "symtab.h"
 
-void ir_error(const char *msg, AST *node) {
-    fprintf(stderr, "Code generation error in file %s line %d\n\t%s\n", 
-            node->filename,
-            ast_get_line_no(node), msg);
-}
-
 void irlist_init(IRList *l) {
     l->head = NULL;
     l->tail = NULL;
@@ -87,12 +81,6 @@ void ir_print(IRList *ir, FILE *out) {
                 break;
             case IR_STORE_GLOBAL:
                 fprintf(out, "STORE_GLOBAL %s\n", p->s ? p->s : "?");
-                break;
-             case IR_ARRAY_LOAD:
-                fprintf(out, "ARRAY_LOAD\n");
-                break;
-            case IR_ARRAY_STORE:
-                fprintf(out, "ARRAY_STORE\n");
                 break;
             case IR_LOAD_LOCAL:
                 fprintf(out, "LOAD_LOCAL %d\n", p->i);
@@ -320,15 +308,12 @@ static void gen_unary(AST *n, IRList *out) {
     }
 }
 
-static void gen_assign(AST *n, IRList *out, bool need_value) {
+static void gen_assign(AST *n, IRList *out) {
     // Handle compound assignment operators
     if (n->assign.op != AOP_ASSIGN) {
         // For compound assignment like +=, we need to load, operate, then store
         if (n->assign.lhs->kind == AST_ID) {
-            // FIX: Get symbol from the LHS, not from the assignment node
             Symbol *sym = n->assign.lhs->symbol;
-
-            //printf("Generating compound assignment for identifier: %s, is_local: %d\n", n->assign.lhs->id, n->assign.lhs->symbol->is_local);
             
             // Load current value
             if (sym && sym->is_local) {
@@ -356,45 +341,77 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             // Store result
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
-                if(need_value){
-                    ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
-                }
+                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
             } else {
-                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+<<<<<<< HEAD
+                ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0, sym);
                 if(need_value){
-                    ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+                    ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0, sym);
                 }
+=======
+                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
             }
         }
     } else {
         // Simple assignment
+<<<<<<< HEAD
         if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
+            // For array[index] = value:
+            // Stack needs to be: array, index, value (in that order for iastore)
+            
             gen_expr(n->assign.lhs->array.array, out);   // array ref
             gen_expr(n->assign.lhs->array.index, out);   // index
             gen_expr(n->assign.rhs, out);                // value
-
+            
+            // If we need the value (for chained assignment), we need to duplicate it
+            // BEFORE the store, but the stack order for iastore is: array, index, value
+            // So we need: array, index, value, value (with dup_x2 to get value below array/index)
             if (need_value) {
-                ir_emit(out, IR_DUP, NULL, 0);
+                // Stack: array, index, value
+                // We want: value, array, index, value (so after iastore, value remains)
+                // Use dup_x2: duplicates top value and inserts it 2 slots down
+                // This gives us: array, value, index, value
+                // That's not quite right... we need a different approach
+                
+                // Better approach: dup, then swap to get the right order
+                // Actually, for iastore we need: arrayref, index, value
+                // To keep value after store, we do: arrayref, index, value, value
+                // Then rotate: arrayref, value, index, value
+                // No, simpler: just dup BEFORE generating the whole sequence
+                
+                // Actually the right way: evaluate RHS first when chained
+                // This is getting complex - let's restructure
             }
 
-            int elem_kind = 0;
-            if (n->assign.lhs->type) elem_kind = n->assign.lhs->type->kind;
-            ir_emit(out, IR_ARRAY_STORE, NULL, elem_kind);
+            Symbol *array_sym = n->assign.lhs->array.array->symbol;
+            ir_emit_with_symbol(out, IR_ARRAY_STORE, NULL, 0, array_sym);
+            
+            if (need_value) {
+                // After store, reload the value we just stored
+                gen_expr(n->assign.lhs->array.array, out);
+                gen_expr(n->assign.lhs->array.index, out);
+                ir_emit_with_symbol(out, IR_ARRAY_LOAD, NULL, 0, array_sym);
+            }
 
         } else if (n->assign.lhs->kind == AST_ID) {
             gen_expr(n->assign.rhs, out);
 
+=======
+        gen_expr(n->assign.rhs, out);
+        
+        if (n->assign.lhs->kind == AST_ID) {
+            // FIX: Get symbol from the LHS
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
             Symbol *sym = n->assign.lhs->symbol;
-
-            if(need_value){
-                ir_emit(out, IR_DUP, NULL, 0);
-            }
+            ir_emit(out, IR_DUP, NULL, 0);
             
             // Store to local or global
             if (sym && sym->is_local) {
                 ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
             } else {
-                ir_emit(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0);
+                ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0, sym);
             }
         }
     }
@@ -449,14 +466,11 @@ static void gen_expr(AST *n, IRList *out) {
         case AST_ID: {
             Symbol *sym = n->symbol;
 
-            //printf("Generating load for identifier: %s\n", n->id);
-            //printf("Symbol info: is_local=%d, local_index=%d\n", sym->is_local, sym->local_index);
-
             if (sym && sym->is_local) {
                 ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
             } else {
-                // printf("!!!! Loading global variable: %s\n", n->id);
-                ir_emit(out, IR_LOAD_GLOBAL, n->id, 0);
+                // Pass symbol for global variables so we can get the correct type descriptor
+                ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->id, 0, sym);
             }
             break;
         }
@@ -466,22 +480,25 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
-            gen_assign(n, out, true);
+            gen_assign(n, out);
             break;
             
         case AST_UNARY:
             gen_unary(n, out);
             break;
+<<<<<<< HEAD
 
         case AST_ARRAY_ACCESS: {
-               gen_expr(n->array.array, out);   // Load array reference
-               gen_expr(n->array.index, out);   // Load index
+            gen_expr(n->array.array, out);   // Load array reference
+            gen_expr(n->array.index, out);   // Load index
 
-               int elem_kind = 0;
-               if (n->type) elem_kind = n->type->kind;
-               ir_emit(out, IR_ARRAY_LOAD, NULL, elem_kind);
-               break;
+            // FIX: Pass the array's symbol so jbcgen can get the element type
+            Symbol *array_sym = n->array.array->symbol;
+            ir_emit_with_symbol(out, IR_ARRAY_LOAD, NULL, 0, array_sym);
+            break;
         }
+=======
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
             
         case AST_FUNC_CALL:
             gen_call(n, out);
@@ -499,7 +516,6 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         default:
-            ir_error("Unsupported expression type in code generation", n);
             break;
     }
 }
@@ -532,9 +548,6 @@ static void gen_stmt(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
-            gen_assign(n, out, false);
-            break;  
-
         case AST_UNARY:
             // Expression statements
             gen_expr(n, out);
@@ -542,15 +555,12 @@ static void gen_stmt(AST *n, IRList *out) {
             break;
             
         default:
-            ir_error("Unsupported statement type in code generation", n);
             break;
     }
 }
 
 void generate_ir_from_ast(AST *ast, IRList *out) {
     if (!ast) return;
-
-    //printf("Generating IR from AST node of kind %d\n", ast->kind);
     
     irlist_init(out);
     
@@ -562,6 +572,4 @@ void generate_ir_from_ast(AST *ast, IRList *out) {
     } else {
         gen_stmt(ast, out);
     }
-
-    //printf("Finished generating IR from AST\n");
 }

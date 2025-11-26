@@ -18,8 +18,6 @@ typedef enum {
     IR_STORE_GLOBAL,
     IR_LOAD_LOCAL,
     IR_STORE_LOCAL,
-    IR_ARRAY_LOAD,
-    IR_ARRAY_STORE,
     IR_PUSH_INT,
     IR_PUSH_FLOAT,
     IR_PUSH_STRING,

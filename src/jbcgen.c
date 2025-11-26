@@ -29,6 +29,34 @@ void emit_class_header(FILE *out, const char *classname) {
     fprintf(out, ".super java/lang/Object\n\n");
 }
 
+void emit_global_field(FILE *out, const char *name, Type *type) {
+    const char *type_desc = "I"; // default to int
+    
+    if (type) {
+        switch(type->kind) {
+            case TY_INT: type_desc = "I"; break;
+            case TY_FLT: type_desc = "F"; break;
+            case TY_CHAR: type_desc = "C"; break;
+            case TY_VOID: type_desc = "V"; break;
+            case TY_ARRAY: 
+                if (type->array_of) {
+                    if (type->array_of->kind == TY_CHAR) type_desc = "[C";
+                    else if (type->array_of->kind == TY_INT) type_desc = "[I";
+                    else if (type->array_of->kind == TY_FLT) type_desc = "[F";
+                    else type_desc = "[I";
+                } else {
+                    type_desc = "[I";
+                }
+                break;
+            case TY_FUNC: type_desc = "I"; break;
+            case TY_STRUCT: type_desc = "Ljava/lang/Object;"; break;
+            default: type_desc = "I"; break;
+        }
+    }
+    
+    fprintf(out, ".field public static %s %s\n", name, type_desc);
+}
+
 static const char* get_type_descriptor(Type *type) {
     if (!type) return "I";
     
@@ -37,46 +65,47 @@ static const char* get_type_descriptor(Type *type) {
         case TY_INT: return "I";
         case TY_FLT: return "F";
         case TY_CHAR: return "C";
+<<<<<<< HEAD
         case TY_ARRAY: {
-        // produce leading '[' for each dimension or nested array
-        int dims = 0;
-        Type *elem = type;
-        while (elem && elem->kind == TY_ARRAY) {
-            dims++;
-            elem = elem->array_of;
+            // produce leading '[' for each dimension or nested array
+            int dims = 0;
+            Type *elem = type;
+            while (elem && elem->kind == TY_ARRAY) {
+                dims++;
+                elem = elem->array_of;
+            }
+
+            // base descriptor for elem
+            const char *base;
+            if (elem->kind == TY_INT) base = "I";
+            else if (elem->kind == TY_CHAR) base = "C";
+            else if (elem->kind == TY_FLT) base = "F";
+            else if (elem->kind == TY_VOID) base = "V"; // unlikely
+            else /* object/pointer */ base = "Ljava/lang/Object;"; // or real class name
+
+            // build string: e.g. "[[I"
+            size_t len = dims + strlen(base) + 1;
+            char *out = malloc(len);
+            if (!out) exit(1);
+            char *p = out;
+            for (int i=0;i<dims;i++) *p++ = '[';
+            strcpy(p, base);
+            return out;
         }
 
-        // base descriptor for elem
-        const char *base;
-        if (elem->kind == TY_INT) base = "I";
-        else if (elem->kind == TY_CHAR) base = "C";
-        else if (elem->kind == TY_VOID) base = "V"; // unlikely
-        else /* object/pointer */ base = "Ljava/lang/Object;"; // or real class name
-
-        // build string: e.g. "[[I"
-        size_t len = dims + strlen(base) + 1;
-        char *out = malloc(len);
-        if (!out) exit(1);
-        char *p = out;
-        for (int i=0;i<dims;i++) *p++ = '[';
-        strcpy(p, base);
-        return out;
-    }
-
+=======
+        case TY_ARRAY: 
+            if (type->array_of) {
+                if (type->array_of->kind == TY_CHAR) return "[C";
+                if (type->array_of->kind == TY_INT) return "[I";
+                if (type->array_of->kind == TY_FLT) return "[F";
+            }
+            return "[I";
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
         case TY_FUNC: return "I";
         case TY_STRUCT: return "Ljava/lang/Object;";
         default: return "I";
     }
-}
-
-void emit_global_field(FILE *out, const char *name, Type *type) {
-    const char *type_desc = "I"; // default to int
-    
-    if (type) {
-        type_desc = get_type_descriptor(type);
-    }
-    
-    fprintf(out, ".field public static %s %s\n", name, type_desc);
 }
 
 void emit_method_header(FILE *out, const char *classname, const char *name, Type *return_type, AST *params) {
@@ -124,21 +153,45 @@ static void emit_comparison(FILE *out, IRKind kind) {
     fprintf(out, "L%d:\n", end_label);
 }
 
-static const char *array_load_opcode(Type *elem) {
+<<<<<<< HEAD
+static const char *array_load_opcode(Type *array_type) {
+    // array_type should be the array type itself, not the element
+    if (!array_type || array_type->kind != TY_ARRAY) {
+        return "iaload"; // default fallback
+    }
+    
+    Type *elem = array_type->array_of;
+    if (!elem) {
+        return "iaload"; // default fallback
+    }
+    
     if (elem->kind == TY_INT)   return "iaload";
     if (elem->kind == TY_CHAR)  return "caload";
-    if (elem->kind == TY_FLT) return "faload";
-    // reference types
+    if (elem->kind == TY_FLT)   return "faload";
+    // reference types (arrays, structs)
     return "aaload";
 }
 
-static const char *array_store_opcode(Type *elem) {
+static const char *array_store_opcode(Type *array_type) {
+    // array_type should be the array type itself, not the element
+    if (!array_type || array_type->kind != TY_ARRAY) {
+        return "iastore"; // default fallback
+    }
+    
+    Type *elem = array_type->array_of;
+    if (!elem) {
+        return "iastore"; // default fallback
+    }
+    
     if (elem->kind == TY_INT)   return "iastore";
     if (elem->kind == TY_CHAR)  return "castore";
-    if (elem->kind == TY_FLT) return "fastore";
+    if (elem->kind == TY_FLT)   return "fastore";
+    // reference types
     return "aastore";
 }
 
+=======
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
 void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
@@ -165,28 +218,14 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
-            case IR_LOAD_GLOBAL: {
-                 const char *field_name = p->s ? p->s : "?";
-                 const char *desc = "I"; // default
-
-                 if (p->symbol && p->symbol->type) {
-                     desc = get_type_descriptor(p->symbol->type);
-                 }
-                 fprintf(out, "    getstatic Field %s %s %s\n", classname, field_name, desc);
-                 break;
-             }
-
-            case IR_STORE_GLOBAL: {
-                  const char *field_name = p->s ? p->s : "?";
-                  const char *desc = "I"; // default
-
-                  if (p->symbol && p->symbol->type) {
-                      desc = get_type_descriptor(p->symbol->type);
-                  }
-                  fprintf(out, "    putstatic Field %s %s %s\n", classname, field_name, desc);
-                  break;
-              }
-
+            case IR_LOAD_GLOBAL:
+                fprintf(out, "    getstatic Field %s %s I\n", classname, p->s);
+                break;
+                
+            case IR_STORE_GLOBAL:
+                fprintf(out, "    putstatic Field %s %s I\n", classname, p->s);
+                break;
+                
             case IR_LOAD_LOCAL:
                 fprintf(out, "    iload_%d\n", p->i);
                 break;
@@ -194,18 +233,23 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             case IR_STORE_LOCAL:
                 fprintf(out, "    istore_%d\n", p->i);
                 break;
+<<<<<<< HEAD
 
             case IR_ARRAY_LOAD: {
-                Type *elem = p->symbol->type->array_of;
-                fprintf(out, "    %s\n", array_load_opcode(elem));  // e.g. "iaload"
+                // Get array type from symbol
+                Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
+                fprintf(out, "    %s\n", array_load_opcode(array_type));
                 break;
             }
                 
             case IR_ARRAY_STORE: {
-                Type *elem = p->symbol->type->array_of;
-                fprintf(out, "    %s\n", array_store_opcode(elem));  
+                // Get array type from symbol
+                Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
+                fprintf(out, "    %s\n", array_store_opcode(array_type));
                 break;
             }
+=======
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
                 
             case IR_ADD:
                 fprintf(out, "    iadd\n");
@@ -328,6 +372,82 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     }
 }
 
+void emit_static_initializer(FILE *out, const char *classname, AST *program) {
+    // Check if we need a static initializer (for array initialization)
+    bool has_arrays = false;
+    
+    // Scan for global array declarations
+    for (AST *n = program; n != NULL; n = n->next) {
+        if (n->kind == AST_DECL && n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
+            has_arrays = true;
+            break;
+        } else if (n->kind == AST_BLOCK) {
+            for (int i = 0; i < n->block.count; i++) {
+                AST *stmt = n->block.statements[i];
+                if (stmt->kind == AST_DECL && stmt->decl.decl_type && stmt->decl.decl_type->kind == TY_ARRAY) {
+                    has_arrays = true;
+                    break;
+                }
+            }
+            if (has_arrays) break;
+        }
+    }
+    
+    if (!has_arrays) return;
+    
+    fprintf(out, "\n.method static <clinit> : ()V\n");
+    fprintf(out, ".code stack 10 locals 0\n");
+    
+    // Initialize each global array
+    for (AST *n = program; n != NULL; n = n->next) {
+        if (n->kind == AST_DECL && n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
+            // For now, assume single-dimensional arrays of size 10 (hardcoded)
+            // In a real implementation, you'd track array sizes
+            fprintf(out, "    bipush 10\n");
+            
+            // Determine array element type
+            Type *elem = n->decl.decl_type->array_of;
+            if (elem && elem->kind == TY_INT) {
+                fprintf(out, "    newarray int\n");
+            } else if (elem && elem->kind == TY_CHAR) {
+                fprintf(out, "    newarray char\n");
+            } else if (elem && elem->kind == TY_FLT) {
+                fprintf(out, "    newarray float\n");
+            } else {
+                fprintf(out, "    newarray int\n"); // default
+            }
+            
+            fprintf(out, "    putstatic Field %s %s %s\n", 
+                    classname, n->decl.name, get_type_descriptor(n->decl.decl_type));
+        } else if (n->kind == AST_BLOCK) {
+            for (int i = 0; i < n->block.count; i++) {
+                AST *stmt = n->block.statements[i];
+                if (stmt->kind == AST_DECL && stmt->decl.decl_type && stmt->decl.decl_type->kind == TY_ARRAY) {
+                    fprintf(out, "    bipush 10\n");
+                    
+                    Type *elem = stmt->decl.decl_type->array_of;
+                    if (elem && elem->kind == TY_INT) {
+                        fprintf(out, "    newarray int\n");
+                    } else if (elem && elem->kind == TY_CHAR) {
+                        fprintf(out, "    newarray char\n");
+                    } else if (elem && elem->kind == TY_FLT) {
+                        fprintf(out, "    newarray float\n");
+                    } else {
+                        fprintf(out, "    newarray int\n");
+                    }
+                    
+                    fprintf(out, "    putstatic Field %s %s %s\n", 
+                            classname, stmt->decl.name, get_type_descriptor(stmt->decl.decl_type));
+                }
+            }
+        }
+    }
+    
+    fprintf(out, "    return\n");
+    fprintf(out, ".end code\n");
+    fprintf(out, ".end method\n");
+}
+
 void emit_init_method(FILE *out, const char *classname) {
     fprintf(out, "\n.method <init> : ()V\n");
     fprintf(out, ".code stack 1 locals 1\n");
@@ -357,16 +477,19 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     IRList ir;
     generate_ir_from_ast(func, &ir);
 
+<<<<<<< HEAD
+=======
 
     // printf("Printing IR for function %s:\n", func->func.name);
-    ir_print(&ir, stdout); // For debugging
+     ir_print(&ir, stdout); // For debugging
                            
-    //printf("Generating function header for %s\n", func->func.name);
+                           
+    
+>>>>>>> parent of 98a2c5f (Fixed statement vs expression assignments for pushing onto stack, began working on array access currently not working)
     // Emit method header
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);
     
-    //printf("Emiting java for %s\n", func->func.name);
     // Emit bytecode from IR
     emit_java_from_ir(out, classname, &ir);
     
@@ -377,7 +500,6 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
         }
     }
     
-    //printf("Emiting footer for %s\n", func->func.name);
     // Emit method footer
     emit_method_footer(out);
 }
@@ -436,6 +558,9 @@ void generate_code(AST *program) {
     
     // First pass: collect and emit global variables
     emit_globals_from_ast(outputFile, program);
+    
+    // CRITICAL: Emit static initializer for arrays BEFORE methods
+    emit_static_initializer(outputFile, classname, program);
     
     // Second pass: emit functions
     emit_functions_from_ast(outputFile, program, classname);
