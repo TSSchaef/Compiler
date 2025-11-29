@@ -44,15 +44,17 @@ typedef enum {
     IR_RETURN_VOID,
     IR_POP,
     IR_DUP,
+    IR_DUP2,            
+    IR_DUP_X2,          // Duplicate top value and insert 3 slots down
     IR_CAST_I2F,
     IR_CAST_F2I,
     IR_CAST_I2D,
     IR_CAST_D2I,
     IR_CAST_F2D,
     IR_CAST_D2F,
-    IR_ARRAY_LOAD,      // NEW: Load value from array
-    IR_ARRAY_STORE,     // NEW: Store value to array
-    IR_ALLOC_ARRAY,     // NEW: Allocate array
+    IR_ARRAY_LOAD,     
+    IR_ARRAY_STORE,   
+    IR_ALLOC_ARRAY,  
 } IRKind;
 
 typedef struct IRInstruction {

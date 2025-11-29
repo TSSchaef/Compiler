@@ -65,33 +65,13 @@ static const char* get_type_descriptor(Type *type) {
         case TY_INT: return "I";
         case TY_FLT: return "F";
         case TY_CHAR: return "C";
-        case TY_ARRAY: {
-            // produce leading '[' for each dimension or nested array
-            int dims = 0;
-            Type *elem = type;
-            while (elem && elem->kind == TY_ARRAY) {
-                dims++;
-                elem = elem->array_of;
+        case TY_ARRAY: 
+            if (type->array_of) {
+                if (type->array_of->kind == TY_CHAR) return "[C";
+                if (type->array_of->kind == TY_INT) return "[I";
+                if (type->array_of->kind == TY_FLT) return "[F";
             }
-
-            // base descriptor for elem
-            const char *base;
-            if (elem->kind == TY_INT) base = "I";
-            else if (elem->kind == TY_CHAR) base = "C";
-            else if (elem->kind == TY_FLT) base = "F";
-            else if (elem->kind == TY_VOID) base = "V"; // unlikely
-            else /* object/pointer */ base = "Ljava/lang/Object;"; // or real class name
-
-            // build string: e.g. "[[I"
-            size_t len = dims + strlen(base) + 1;
-            char *out = malloc(len);
-            if (!out) exit(1);
-            char *p = out;
-            for (int i=0;i<dims;i++) *p++ = '[';
-            strcpy(p, base);
-            return out;
-        }
-
+            return "[I";
         case TY_FUNC: return "I";
         case TY_STRUCT: return "Ljava/lang/Object;";
         default: return "I";
@@ -143,7 +123,6 @@ static void emit_comparison(FILE *out, IRKind kind) {
     fprintf(out, "L%d:\n", end_label);
 }
 
-// Helper functions for array operations
 static const char *array_load_opcode(Type *array_type) {
     if (!array_type || array_type->kind != TY_ARRAY) {
         return "iaload";
@@ -213,13 +192,23 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    invokestatic Method lib440 java2c (Ljava/lang/String;)[C\n");
                 break;
                 
-            case IR_LOAD_GLOBAL:
-                fprintf(out, "    getstatic Field %s %s I\n", classname, p->s);
+            case IR_LOAD_GLOBAL: {
+                const char *type_desc = "I";
+                if (p->symbol && p->symbol->type) {
+                    type_desc = get_type_descriptor(p->symbol->type);
+                }
+                fprintf(out, "    getstatic Field %s %s %s\n", classname, p->s, type_desc);
                 break;
+            }
                 
-            case IR_STORE_GLOBAL:
-                fprintf(out, "    putstatic Field %s %s I\n", classname, p->s);
+            case IR_STORE_GLOBAL: {
+                const char *type_desc = "I";
+                if (p->symbol && p->symbol->type) {
+                    type_desc = get_type_descriptor(p->symbol->type);
+                }
+                fprintf(out, "    putstatic Field %s %s %s\n", classname, p->s, type_desc);
                 break;
+            }
                 
             case IR_LOAD_LOCAL:
                 fprintf(out, "    iload_%d\n", p->i);
@@ -229,7 +218,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    istore_%d\n", p->i);
                 break;
 
-                case IR_ARRAY_LOAD: {
+            case IR_ARRAY_LOAD: {
                 Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
                 fprintf(out, "    %s\n", array_load_opcode(array_type));
                 break;
@@ -242,7 +231,6 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             }
             
             case IR_ALLOC_ARRAY: {
-                // Stack already has the size on top
                 Type *elem_type = NULL;
                 if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_ARRAY) {
                     elem_type = p->symbol->type->array_of;
@@ -250,7 +238,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    newarray %s\n", newarray_type(elem_type));
                 break;
             }
-
+                
             case IR_ADD:
                 fprintf(out, "    iadd\n");
                 break;
@@ -327,8 +315,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                         fprintf(out, "    invokestatic Method lib440 putstring ([C)V\n");
                     }
                 } else {
-                    // User-defined function - get return type from symbol
-                    const char *return_desc = "I"; // default to int
+                    const char *return_desc = "I";
                     
                     if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FUNC) {
                         return_desc = get_type_descriptor(p->symbol->type->return_type);
@@ -358,6 +345,14 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 fprintf(out, "    dup\n");
                 break;
                 
+            case IR_DUP2:
+                fprintf(out, "    dup2\n");
+                break;
+                
+            case IR_DUP_X2:
+                fprintf(out, "    dup_x2\n");
+                break;
+                
             case IR_CAST_I2F:
                 fprintf(out, "    i2f\n");
                 break;
@@ -373,10 +368,8 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
 }
 
 void emit_static_initializer(FILE *out, const char *classname, AST *program) {
-    // Check if we need a static initializer (for array initialization)
     bool has_arrays = false;
     
-    // Scan for global array declarations
     for (AST *n = program; n != NULL; n = n->next) {
         if (n->kind == AST_DECL && n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
             has_arrays = true;
@@ -395,17 +388,23 @@ void emit_static_initializer(FILE *out, const char *classname, AST *program) {
     
     if (!has_arrays) return;
     
-    fprintf(out, "\n.method static <clinit> : ()V\n");
+fprintf(out, "\n.method static <clinit> : ()V\n");
     fprintf(out, ".code stack 10 locals 0\n");
     
-    // Initialize each global array
     for (AST *n = program; n != NULL; n = n->next) {
         if (n->kind == AST_DECL && n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
-            // For now, assume single-dimensional arrays of size 10 (hardcoded)
-            // In a real implementation, you'd track array sizes
-            fprintf(out, "    bipush 10\n");
+            // CHANGE THIS: Use actual array size
+            int array_size = n->decl.decl_type->array_size > 0 ? 
+                            n->decl.decl_type->array_size : 10;
             
-            // Determine array element type
+            if (array_size <= 127) {
+                fprintf(out, "    bipush %d\n", array_size);
+            } else if (array_size <= 32767) {
+                fprintf(out, "    sipush %d\n", array_size);
+            } else {
+                fprintf(out, "    ldc %d\n", array_size);
+            }
+            
             Type *elem = n->decl.decl_type->array_of;
             if (elem && elem->kind == TY_INT) {
                 fprintf(out, "    newarray int\n");
@@ -414,7 +413,7 @@ void emit_static_initializer(FILE *out, const char *classname, AST *program) {
             } else if (elem && elem->kind == TY_FLT) {
                 fprintf(out, "    newarray float\n");
             } else {
-                fprintf(out, "    newarray int\n"); // default
+                fprintf(out, "    newarray int\n");
             }
             
             fprintf(out, "    putstatic Field %s %s %s\n", 
@@ -423,7 +422,17 @@ void emit_static_initializer(FILE *out, const char *classname, AST *program) {
             for (int i = 0; i < n->block.count; i++) {
                 AST *stmt = n->block.statements[i];
                 if (stmt->kind == AST_DECL && stmt->decl.decl_type && stmt->decl.decl_type->kind == TY_ARRAY) {
-                    fprintf(out, "    bipush 10\n");
+                    // SAME CHANGES as above for block statements
+                    int array_size = stmt->decl.decl_type->array_size > 0 ? 
+                                    stmt->decl.decl_type->array_size : 10;
+                    
+                    if (array_size <= 127) {
+                        fprintf(out, "    bipush %d\n", array_size);
+                    } else if (array_size <= 32767) {
+                        fprintf(out, "    sipush %d\n", array_size);
+                    } else {
+                        fprintf(out, "    ldc %d\n", array_size);
+                    }
                     
                     Type *elem = stmt->decl.decl_type->array_of;
                     if (elem && elem->kind == TY_INT) {
@@ -468,35 +477,25 @@ void emit_java_main(FILE *out, const char *classname) {
     fprintf(out, ".end method\n");
 }
 
-// Generate code for a single function
 static void generate_function(FILE *out, AST *func, const char *classname) {
     if (!func || func->kind != AST_FUNC) return;
 
-    
-    // Generate IR for this function
     IRList ir;
     generate_ir_from_ast(func, &ir);
 
+    ir_print(&ir, stdout); // For debugging
 
-    // printf("Printing IR for function %s:\n", func->func.name);
-     ir_print(&ir, stdout); // For debugging
-                           
-                           
-    // Emit method header
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);
     
-    // Emit bytecode from IR
     emit_java_from_ir(out, classname, &ir);
     
-    // Add default return if needed (and no explicit return was generated)
     if (func->func.return_type && func->func.return_type->kind == TY_VOID) {
         if (!ir.tail || ir.tail->kind != IR_RETURN_VOID) {
             fprintf(out, "    return\n");
         }
     }
     
-    // Emit method footer
     emit_method_footer(out);
 }
 
@@ -505,19 +504,15 @@ static void emit_functions_from_ast(FILE *out, AST *node, const char *classname)
 
     for (AST *n = node; n != NULL; n = n->next) {
         if (n->kind == AST_FUNC) {
-            // This is a function definition
             generate_function(out, n, classname);
         } else if (n->kind == AST_BLOCK) {
-            // Recursively process blocks to find functions
             for (int i = 0; i < n->block.count; i++) {
                 emit_functions_from_ast(out, n->block.statements[i], classname);
             }
         }
-        // Skip other top-level nodes (declarations, etc.)
     }
 }
 
-// Helper function to collect global variables from AST
 static void emit_globals_from_ast(FILE *out, AST *node) {
     if (!node) return;
     
@@ -525,7 +520,6 @@ static void emit_globals_from_ast(FILE *out, AST *node) {
         if (n->kind == AST_DECL) {
             emit_global_field(out, n->decl.name, n->decl.decl_type);
         } else if (n->kind == AST_BLOCK) {
-            // Recursively process blocks
             for (int i = 0; i < n->block.count; i++) {
                 emit_globals_from_ast(out, n->block.statements[i]);
             }
@@ -533,7 +527,6 @@ static void emit_globals_from_ast(FILE *out, AST *node) {
     }
 }
 
-// Main code generation entry point
 void generate_code(AST *program) {
     if (!program) {
         fprintf(stderr, "Code generation error: NULL program AST\n");
@@ -545,23 +538,13 @@ void generate_code(AST *program) {
         return;
     }
     
-    // Get classname from output filename
     char *output_filename = getOutputFileName();
     char *classname = get_classname_from_output(output_filename);
     
-    // Emit class header
     emit_class_header(outputFile, classname);
-    
-    // First pass: collect and emit global variables
     emit_globals_from_ast(outputFile, program);
-    
-    // CRITICAL: Emit static initializer for arrays BEFORE methods
     emit_static_initializer(outputFile, classname, program);
-    
-    // Second pass: emit functions
     emit_functions_from_ast(outputFile, program, classname);
-    
-    // Emit special methods
     emit_init_method(outputFile, classname);
     emit_java_main(outputFile, classname);
     

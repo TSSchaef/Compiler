@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 static Type *current_function_return_type = NULL;
+static bool in_function = false;
 
 // Type constructors
 Type *type_int() {
@@ -800,18 +801,25 @@ static void type_check_node(AST *node) {
         // Ensure struct types have their members properly linked
         link_struct_members(node->decl.decl_type);
 
+        if (node->decl.decl_type && node->decl.decl_type->kind == TY_ARRAY) {
+            if (node->decl.init) {
+                // If init is a string literal, capture its length
+                if (node->decl.init->kind == AST_STRING_LITERAL) {
+                    node->decl.decl_type->array_size = strlen(node->decl.init->strval) + 1;
+                }
+                // If init is an array literal, capture its size (would need AST support)
+                // For now, default to a reasonable size if not specified
+                else if (node->decl.decl_type->array_size == 0) {
+                    node->decl.decl_type->array_size = 10;
+                }
+            } else if (node->decl.decl_type->array_size == 0) {
+                node->decl.decl_type->array_size = 10;
+            }
+        }
+
         // Check if it's a struct type declaration
         if (node->decl.decl_type && node->decl.decl_type->kind == TY_STRUCT) {
-            // Verify the struct type exists
-            Type *struct_def = lookup_struct(node->decl.decl_type->struct_name);
-            if (!struct_def) {
-                char buf[256];
-                snprintf(buf, sizeof(buf), 
-                        "Variable '%s' declared with undefined struct type '%s'",
-                        node->decl.name, node->decl.decl_type->struct_name);
-                error(buf, node);
-                // Don't return - still add to symbol table to avoid cascading errors
-            }
+            // ... existing struct code ...
         }
 
         if(!add_symbol(node->decl.name, node->decl.decl_type)){
@@ -896,7 +904,6 @@ static void type_check_node(AST *node) {
            // Count parameters
            for (AST *p = param; p; p = p->next) {
                param_count++;
-               p->symbol = copy_symbol(lookup_symbol(p->decl.name));  
            }
 
            if (param_count > 0) {
@@ -920,6 +927,7 @@ static void type_check_node(AST *node) {
            enter_scope();  // Enter function scope
 
            // Add parameters to function scope (they are local variables)
+           int param_index = 0;
            for (AST *p = param; p; p = p->next) {
                // Check if parameter is a struct type
                if (p->decl.decl_type && p->decl.decl_type->kind == TY_STRUCT) {
@@ -939,6 +947,14 @@ static void type_check_node(AST *node) {
                            "Redeclaration of parameter '%s' in function '%s'",
                            p->decl.name, node->func.name);
                    error(buf, node);
+               } else {
+                   Symbol *param_sym = lookup_symbol_current(p->decl.name);
+                   if (param_sym) {
+                       param_sym->is_local = true;
+                       param_sym->local_index = param_index;
+                   }
+                   // Store symbol in AST node for later IR generation
+                   param_index++;
                }
 
                if(p->decl.decl_type->kind == TY_VOID){
@@ -950,21 +966,24 @@ static void type_check_node(AST *node) {
                }
            }
 
-           // Set current function return type for return statement checking
+           set_local_count(param_count);
+           //printf("Function '%s' has %d parameters\n", node->func.name, param_index);
+           
            Type *prev_return_type = current_function_return_type;
            current_function_return_type = node->func.return_type;
+            
+            // Indicate we are inside a function and don't enter_scope for the body again
+           in_function = true;
 
            type_check_node(node->func.body);
 
-           // Restore previous return type (for nested functions if you support them)
            current_function_return_type = prev_return_type;
 
            exit_scope();  // Exit function scope
 
            node->type = ft;
            break;
-                   }
-
+       }
 
      case AST_FUNC_CALL: {
         type_check_node(node->call.callee);
@@ -1086,8 +1105,12 @@ static void type_check_node(AST *node) {
         break;
     }
 
-    case AST_BLOCK:
-        enter_scope();
+     case AST_BLOCK: {
+        bool should_skip_scope = in_function;
+        in_function = false;
+
+        if(!should_skip_scope) enter_scope();
+
         for (int i = 0; i < node->block.count; i++) {
             AST *stmt = node->block.statements[i];
             
@@ -1097,9 +1120,10 @@ static void type_check_node(AST *node) {
                 type_check_node(stmt);
             }
         }
-        exit_scope();
+        if(!should_skip_scope) exit_scope();
         node->type = type_void();
         break;
+    }
 
     case AST_IF:
         type_check_node(node->if_stmt.cond);

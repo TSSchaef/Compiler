@@ -271,6 +271,8 @@ bool add_symbol(const char *name, Type *type) {
         new_sym->local_index = -1;
     }
 
+    printf("Symbol '%s' added with local_index=%d\n", name, new_sym->local_index);
+
     table[idx] = new_sym;
     return true;
 }
@@ -426,3 +428,8 @@ Symbol *copy_symbol(const Symbol *sym){
     return new_sym;
 }
 
+void set_local_count(int count) {
+    if (current_scope) {
+        current_scope->local_count = count;
+    }
+}

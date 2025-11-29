@@ -18,6 +18,8 @@ typedef struct Type {
     char *struct_name;           // Name of the struct type
     StructMember *members;       // Linked list of struct members
     int member_count;            // Number of members
+                                 //
+    int array_size;             // For array types
 } Type;
 
 // Struct member definition
@@ -40,7 +42,7 @@ typedef struct Scope {
     Symbol **func_table;     // Separate table for functions
     Symbol **struct_table;   // Separate table for struct definitions
     int bucket_count;
-    int local_count;         // NEW: number of local variables in this scope
+    int local_count;         
     struct Scope *parent;
 } Scope;
 
@@ -70,7 +72,8 @@ StructMember *struct_member_find(Type *struct_type, const char *member_name);
 
 // Initialize standard library functions (ComS 440 standard library)
 void init_stdlib();
-
+void set_local_count(int count);
+    
 // Helper to check if a function is a standard library function
 bool is_stdlib_function(const char *name);
 
