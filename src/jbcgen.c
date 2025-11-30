@@ -24,6 +24,15 @@ void codegen_error(const char *msg, AST *node) {
             ast_get_line_no(node), msg);
 }
 
+// Helper function to check if an IR instruction operates on floats
+static bool is_float_operation(IRInstruction *p) {
+    if (!p->symbol || !p->symbol->type) {
+        fprintf(stderr, "Warning: IR instruction missing type information\n");
+        return false;
+    }
+    return p->symbol->type->kind == TY_FLT;
+}
+
 void emit_class_header(FILE *out, const char *classname) {
     fprintf(out, ".class public %s\n", classname);
     fprintf(out, ".super java/lang/Object\n\n");
@@ -184,7 +193,17 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_PUSH_FLOAT:
-                fprintf(out, "    ldc %f\n", p->f);
+                // Special handling for common float constants
+                if (p->f == 0.0f) {
+                    fprintf(out, "    fconst_0\n");
+                } else if (p->f == 1.0f) {
+                    fprintf(out, "    fconst_1\n");
+                } else if (p->f == 2.0f) {
+                    fprintf(out, "    fconst_2\n");
+                } else {
+                    // Use %f format but append 'f' to make it a float literal
+                    fprintf(out, "    ldc %ff\n", p->f);
+                }
                 break;
                 
             case IR_PUSH_STRING:
@@ -210,13 +229,23 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
             }
                 
-            case IR_LOAD_LOCAL:
-                fprintf(out, "    iload_%d\n", p->i);
+            case IR_LOAD_LOCAL: {
+                if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FLT) {
+                    fprintf(out, "    fload_%d\n", p->i);
+                } else {
+                    fprintf(out, "    iload_%d\n", p->i);
+                }
                 break;
+            }
                 
-            case IR_STORE_LOCAL:
-                fprintf(out, "    istore_%d\n", p->i);
+            case IR_STORE_LOCAL: {
+                if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FLT) {
+                    fprintf(out, "    fstore_%d\n", p->i);
+                } else {
+                    fprintf(out, "    istore_%d\n", p->i);
+                }
                 break;
+            }
 
             case IR_ARRAY_LOAD: {
                 Type *array_type = (p->symbol && p->symbol->type) ? p->symbol->type : NULL;
@@ -240,27 +269,27 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             }
                 
             case IR_ADD:
-                fprintf(out, "    iadd\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "fadd" : "iadd");
                 break;
                 
             case IR_SUB:
-                fprintf(out, "    isub\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "fsub" : "isub");
                 break;
                 
             case IR_MUL:
-                fprintf(out, "    imul\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "fmul" : "imul");
                 break;
                 
             case IR_DIV:
-                fprintf(out, "    idiv\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "fdiv" : "idiv");
                 break;
                 
             case IR_MOD:
-                fprintf(out, "    irem\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "frem" : "irem");
                 break;
                 
             case IR_NEG:
-                fprintf(out, "    ineg\n");
+                fprintf(out, "    %s\n", is_float_operation(p) ? "fneg" : "ineg");
                 break;
                 
             case IR_BIT_AND:
@@ -388,12 +417,11 @@ void emit_static_initializer(FILE *out, const char *classname, AST *program) {
     
     if (!has_arrays) return;
     
-fprintf(out, "\n.method static <clinit> : ()V\n");
+    fprintf(out, "\n.method static <clinit> : ()V\n");
     fprintf(out, ".code stack 10 locals 0\n");
     
     for (AST *n = program; n != NULL; n = n->next) {
         if (n->kind == AST_DECL && n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
-            // CHANGE THIS: Use actual array size
             int array_size = n->decl.decl_type->array_size > 0 ? 
                             n->decl.decl_type->array_size : 10;
             
@@ -422,7 +450,6 @@ fprintf(out, "\n.method static <clinit> : ()V\n");
             for (int i = 0; i < n->block.count; i++) {
                 AST *stmt = n->block.statements[i];
                 if (stmt->kind == AST_DECL && stmt->decl.decl_type && stmt->decl.decl_type->kind == TY_ARRAY) {
-                    // SAME CHANGES as above for block statements
                     int array_size = stmt->decl.decl_type->array_size > 0 ? 
                                     stmt->decl.decl_type->array_size : 10;
                     
@@ -483,7 +510,7 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     IRList ir;
     generate_ir_from_ast(func, &ir);
 
-    ir_print(&ir, stdout); // For debugging
+    ir_print(&ir, stdout);
 
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);

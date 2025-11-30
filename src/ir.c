@@ -54,6 +54,16 @@ void ir_emit_float(IRList *l, IRKind k, float f) {
     }
 }
 
+// Helper to create a dummy symbol with just type information
+static Symbol* create_type_symbol(Type *t) {
+    Symbol *s = calloc(1, sizeof(Symbol));
+    s->name = NULL;
+    s->type = t;
+    s->is_local = false;
+    s->local_index = -1;
+    return s;
+}
+
 // Print IR in readable format for debugging
 void ir_print(IRList *ir, FILE *out) {
     if (!ir || !out) return;
@@ -213,12 +223,15 @@ static void gen_binop(AST *n, IRList *out) {
     gen_expr(n->binop.left, out);
     gen_expr(n->binop.right, out);
     
+    // Pass result type with the operation
+    Symbol *type_sym = create_type_symbol(n->type);
+    
     switch(n->binop.op) {
-        case OP_ADD: ir_emit(out, IR_ADD, NULL, 0); break;
-        case OP_SUB: ir_emit(out, IR_SUB, NULL, 0); break;
-        case OP_MUL: ir_emit(out, IR_MUL, NULL, 0); break;
-        case OP_DIV: ir_emit(out, IR_DIV, NULL, 0); break;
-        case OP_MOD: ir_emit(out, IR_MOD, NULL, 0); break;
+        case OP_ADD: ir_emit_with_symbol(out, IR_ADD, NULL, 0, type_sym); break;
+        case OP_SUB: ir_emit_with_symbol(out, IR_SUB, NULL, 0, type_sym); break;
+        case OP_MUL: ir_emit_with_symbol(out, IR_MUL, NULL, 0, type_sym); break;
+        case OP_DIV: ir_emit_with_symbol(out, IR_DIV, NULL, 0, type_sym); break;
+        case OP_MOD: ir_emit_with_symbol(out, IR_MOD, NULL, 0, type_sym); break;
         case OP_BIT_AND: ir_emit(out, IR_BIT_AND, NULL, 0); break;
         case OP_BIT_OR: ir_emit(out, IR_BIT_OR, NULL, 0); break;
         case OP_BIT_XOR: ir_emit(out, IR_BIT_XOR, NULL, 0); break;
@@ -237,9 +250,11 @@ static void gen_binop(AST *n, IRList *out) {
 static void gen_unary(AST *n, IRList *out) {
     gen_expr(n->unary.operand, out);
     
+    Symbol *type_sym = create_type_symbol(n->type);
+    
     switch(n->unary.op) {
         case UOP_NEG:
-            ir_emit(out, IR_NEG, NULL, 0);
+            ir_emit_with_symbol(out, IR_NEG, NULL, 0, type_sym);
             break;
         case UOP_BITWISE_NOT:
             ir_emit(out, IR_BIT_NOT, NULL, 0);
@@ -255,10 +270,11 @@ static void gen_unary(AST *n, IRList *out) {
                 Type *from = n->unary.operand->type;
                 Type *to = n->unary.cast_type;
                 
-                if (from->kind == TY_INT && to->kind == TY_FLT)
+                if (from->kind == TY_INT && to->kind == TY_FLT) {
                     ir_emit(out, IR_CAST_I2F, NULL, 0);
-                else if (from->kind == TY_FLT && to->kind == TY_INT)
+                } else if (from->kind == TY_FLT && to->kind == TY_INT) {
                     ir_emit(out, IR_CAST_F2I, NULL, 0);
+                }
             }
             break;
         case UOP_PRE_INC:
@@ -270,19 +286,19 @@ static void gen_unary(AST *n, IRList *out) {
                     ir_emit(out, IR_DUP, NULL, 0);
                 }
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
-                ir_emit(out, IR_ADD, NULL, 0);
+                ir_emit_with_symbol(out, IR_ADD, NULL, 0, type_sym);
                 
                 if (sym && sym->is_local) {
-                    ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                    ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
                 } else {
-                    ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                    ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->unary.operand->id, 0, sym);
                 }
                 
                 if (n->unary.op == UOP_PRE_INC) {
                     if (sym && sym->is_local) {
-                        ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                        ir_emit_with_symbol(out, IR_LOAD_LOCAL, NULL, sym->local_index, sym);
                     } else {
-                        ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                        ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0, sym);
                     }
                 }
             }
@@ -295,19 +311,19 @@ static void gen_unary(AST *n, IRList *out) {
                     ir_emit(out, IR_DUP, NULL, 0);
                 }
                 ir_emit(out, IR_PUSH_INT, NULL, 1);
-                ir_emit(out, IR_SUB, NULL, 0);
+                ir_emit_with_symbol(out, IR_SUB, NULL, 0, type_sym);
                 
                 if (sym && sym->is_local) {
-                    ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                    ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
                 } else {
-                    ir_emit(out, IR_STORE_GLOBAL, n->unary.operand->id, 0);
+                    ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->unary.operand->id, 0, sym);
                 }
                 
                 if (n->unary.op == UOP_PRE_DEC) {
                     if (sym && sym->is_local) {
-                        ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                        ir_emit_with_symbol(out, IR_LOAD_LOCAL, NULL, sym->local_index, sym);
                     } else {
-                        ir_emit(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0);
+                        ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->unary.operand->id, 0, sym);
                     }
                 }
             }
@@ -329,12 +345,14 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             ir_emit_with_symbol(out, IR_ARRAY_LOAD, NULL, 0, array_sym);
             gen_expr(n->assign.rhs, out);
             
+            Symbol *type_sym = create_type_symbol(n->type);
+            
             switch(n->assign.op) {
-                case AOP_ADD_ASSIGN: ir_emit(out, IR_ADD, NULL, 0); break;
-                case AOP_SUB_ASSIGN: ir_emit(out, IR_SUB, NULL, 0); break;
-                case AOP_MUL_ASSIGN: ir_emit(out, IR_MUL, NULL, 0); break;
-                case AOP_DIV_ASSIGN: ir_emit(out, IR_DIV, NULL, 0); break;
-                case AOP_MOD_ASSIGN: ir_emit(out, IR_MOD, NULL, 0); break;
+                case AOP_ADD_ASSIGN: ir_emit_with_symbol(out, IR_ADD, NULL, 0, type_sym); break;
+                case AOP_SUB_ASSIGN: ir_emit_with_symbol(out, IR_SUB, NULL, 0, type_sym); break;
+                case AOP_MUL_ASSIGN: ir_emit_with_symbol(out, IR_MUL, NULL, 0, type_sym); break;
+                case AOP_DIV_ASSIGN: ir_emit_with_symbol(out, IR_DIV, NULL, 0, type_sym); break;
+                case AOP_MOD_ASSIGN: ir_emit_with_symbol(out, IR_MOD, NULL, 0, type_sym); break;
                 case AOP_AND_ASSIGN: ir_emit(out, IR_BIT_AND, NULL, 0); break;
                 case AOP_OR_ASSIGN: ir_emit(out, IR_BIT_OR, NULL, 0); break;
                 case AOP_XOR_ASSIGN: ir_emit(out, IR_BIT_XOR, NULL, 0); break;
@@ -353,19 +371,21 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             Symbol *sym = n->assign.lhs->symbol;
             
             if (sym && sym->is_local) {
-                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                ir_emit_with_symbol(out, IR_LOAD_LOCAL, NULL, sym->local_index, sym);
             } else {
-                ir_emit(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0);
+                ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->assign.lhs->id, 0, sym);
             }
             
             gen_expr(n->assign.rhs, out);
             
+            Symbol *type_sym = create_type_symbol(n->type);
+            
             switch(n->assign.op) {
-                case AOP_ADD_ASSIGN: ir_emit(out, IR_ADD, NULL, 0); break;
-                case AOP_SUB_ASSIGN: ir_emit(out, IR_SUB, NULL, 0); break;
-                case AOP_MUL_ASSIGN: ir_emit(out, IR_MUL, NULL, 0); break;
-                case AOP_DIV_ASSIGN: ir_emit(out, IR_DIV, NULL, 0); break;
-                case AOP_MOD_ASSIGN: ir_emit(out, IR_MOD, NULL, 0); break;
+                case AOP_ADD_ASSIGN: ir_emit_with_symbol(out, IR_ADD, NULL, 0, type_sym); break;
+                case AOP_SUB_ASSIGN: ir_emit_with_symbol(out, IR_SUB, NULL, 0, type_sym); break;
+                case AOP_MUL_ASSIGN: ir_emit_with_symbol(out, IR_MUL, NULL, 0, type_sym); break;
+                case AOP_DIV_ASSIGN: ir_emit_with_symbol(out, IR_DIV, NULL, 0, type_sym); break;
+                case AOP_MOD_ASSIGN: ir_emit_with_symbol(out, IR_MOD, NULL, 0, type_sym); break;
                 case AOP_AND_ASSIGN: ir_emit(out, IR_BIT_AND, NULL, 0); break;
                 case AOP_OR_ASSIGN: ir_emit(out, IR_BIT_OR, NULL, 0); break;
                 case AOP_XOR_ASSIGN: ir_emit(out, IR_BIT_XOR, NULL, 0); break;
@@ -379,7 +399,7 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             }
             
             if (sym && sym->is_local) {
-                ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
             } else {
                 ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0, sym);
             }
@@ -387,25 +407,16 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
     } else {
         // Simple assignment
         if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
-            // For array assignments: arr[idx] = value
-            // We need final stack state: arrayref, index, value
-            // Then iastore consumes all three
+            gen_expr(n->assign.lhs->array.array, out);
+            gen_expr(n->assign.lhs->array.index, out);
+            gen_expr(n->assign.rhs, out);
             
-            // Strategy: evaluate array, index, then value in that order
-            gen_expr(n->assign.lhs->array.array, out);  // arrayref
-            gen_expr(n->assign.lhs->array.index, out);  // index
-            gen_expr(n->assign.rhs, out);               // value
-            
-            // Stack: arrayref, index, value
             if (need_value) {
-                // We need to keep the value after the store
-                // Use dup_x2: value, arrayref, index, value
                 ir_emit(out, IR_DUP_X2, NULL, 0);
             }
             
             Symbol *array_sym = n->assign.lhs->array.array->symbol;
             ir_emit_with_symbol(out, IR_ARRAY_STORE, NULL, 0, array_sym);
-            // After store: [value] (if need_value was true)
             
         } else if (n->assign.lhs->kind == AST_ID) {
             gen_expr(n->assign.rhs, out);
@@ -416,7 +427,7 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             }
             
             if (sym && sym->is_local) {
-                ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+                ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
             } else {
                 ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->assign.lhs->id, 0, sym);
             }
@@ -472,7 +483,7 @@ static void gen_expr(AST *n, IRList *out) {
             Symbol *sym = n->symbol;
 
             if (sym && sym->is_local) {
-                ir_emit(out, IR_LOAD_LOCAL, NULL, sym->local_index);
+                ir_emit_with_symbol(out, IR_LOAD_LOCAL, NULL, sym->local_index, sym);
             } else {
                 ir_emit_with_symbol(out, IR_LOAD_GLOBAL, n->id, 0, sym);
             }
@@ -484,7 +495,7 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
-            gen_assign(n, out, true);  // Assignments in expression context need value
+            gen_assign(n, out, true);
             break;
             
         case AST_UNARY:
@@ -528,12 +539,17 @@ void gen_decl(AST *n, IRList *out) {
         
         // For local arrays, we need to allocate and store
         if (sym && sym->is_local) {
-            // CHANGE THIS: Use actual array size from type
-            int array_size = n->decl.decl_type->array_size > 0 ? 
-                            n->decl.decl_type->array_size : 10;
+            int array_size;
+            if(n->decl.decl_type->array_size > 0){
+                array_size = n->decl.decl_type->array_size;
+            } else {
+                printf("Warning: Array size not specified, defaulting to 10\n");
+                array_size = 10;
+            }
+
             ir_emit(out, IR_PUSH_INT, NULL, array_size);
             ir_emit_with_symbol(out, IR_ALLOC_ARRAY, n->decl.name, 0, sym);
-            ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+            ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
         }
     }
     
@@ -543,7 +559,7 @@ void gen_decl(AST *n, IRList *out) {
         
         Symbol *sym = n->symbol;
         if (sym && sym->is_local) {
-            ir_emit(out, IR_STORE_LOCAL, NULL, sym->local_index);
+            ir_emit_with_symbol(out, IR_STORE_LOCAL, NULL, sym->local_index, sym);
         } else {
             ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->decl.name, 0, sym);
         }
@@ -581,7 +597,7 @@ static void gen_stmt(AST *n, IRList *out) {
             break;
             
         case AST_ASSIGN:
-            gen_assign(n, out, false);  // Assignments in statement context don't need value
+            gen_assign(n, out, false);
             break;
             
         case AST_UNARY:
