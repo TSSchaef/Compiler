@@ -510,7 +510,7 @@ static void generate_function(FILE *out, AST *func, const char *classname) {
     IRList ir;
     generate_ir_from_ast(func, &ir);
 
-    ir_print(&ir, stdout);
+    //ir_print(&ir, stdout);
 
     emit_method_header(out, classname, func->func.name, 
                       func->func.return_type, func->func.params);

@@ -543,7 +543,7 @@ void gen_decl(AST *n, IRList *out) {
             if(n->decl.decl_type->array_size > 0){
                 array_size = n->decl.decl_type->array_size;
             } else {
-                printf("Warning: Array size not specified, defaulting to 10\n");
+                fprintf(stderr, "Warning: Array size not specified, defaulting to 10\n");
                 array_size = 10;
             }
 

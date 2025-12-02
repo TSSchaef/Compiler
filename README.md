@@ -32,7 +32,7 @@ To remove all object, binary, and dependency files generated use:
 
 ## Modes
 
-Modes 1-3 are currently implemented. Mode 1 does NOT require an infile. It will simply print the version information for the compiler.
+There are 5 modes for the compiler. Mode 1 does NOT require an infile. It will simply print the version information for the compiler.
 
 Mode 2 requires an infile and will perform lexical analysis on it, outputting the token stream to a .lexer file. Supported features for the lexer include:
 
@@ -67,7 +67,7 @@ Mode 3 requires an infile and will perform lexical analysis and parsing on it, o
  * User-defined structs 
  * Struct member selection 
 
-Mode 4 requires an infile and will perform lexical analysis, parsing, and type checking on it. It will output the type of all expressions to a .types file. Supported features for the parser include:
+Mode 4 requires an infile and will perform lexical analysis, parsing, and type checking on it. It will output the type of all expressions to a .types file. Supported features for the typechecker include:
 
  * Literals
  * Identifiers (global variables, local variables,
@@ -89,3 +89,20 @@ Mode 4 requires an infile and will perform lexical analysis, parsing, and type c
  * User-defined structs 
  * Struct member selection 
  * const with struct 
+
+Mode 5 requires an infile and will perform a full compilation on it (lexical analysis, parsing, type checking, and code generation). It will output the generated java bytecode in a plaintext file with the .j extension. This can assembled to binary with a Java assembler like Krakatau. Supported features for the code genderation include:
+
+ * class and .super lines
+ * Special method \<init\>
+ * Java main() calls C main()
+ * Java main() exits with return code of C main()
+ * Code for user functions
+ * Function calls and returns
+ * Character, integer, and float literals 
+ * Operators Binary operators +, -, *, /, % 
+ * Unary operators and type conversions 
+ * Global variable, local variable, and parameter writes
+ * Local variable initialization
+ * Arrays
+ * Special method <clinit>
+ * Smart stack management

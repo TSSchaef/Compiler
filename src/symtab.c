@@ -20,7 +20,7 @@ static Scope *new_scope(Scope *parent) {
     s->func_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->struct_table = calloc(s->bucket_count, sizeof(Symbol *));
     s->parent = parent;
-    s->local_count = 0;  // NEW: initialize local count
+    s->local_count = 0;  
     return s;
 }
 
@@ -271,7 +271,7 @@ bool add_symbol(const char *name, Type *type) {
         new_sym->local_index = -1;
     }
 
-    printf("Symbol '%s' added with local_index=%d\n", name, new_sym->local_index);
+    //printf("Symbol '%s' added with local_index=%d\n", name, new_sym->local_index);
 
     table[idx] = new_sym;
     return true;
