@@ -72,6 +72,7 @@
                     strcat(outputFile, ".types");
                     break;
                 case 5:
+                case 6:
                     strcat(outputFile, ".j");
                     break;
                 default:

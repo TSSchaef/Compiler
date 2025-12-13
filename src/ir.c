@@ -1,6 +1,45 @@
 #include "ir.h"
 #include "symtab.h"
 
+static int label_counter = 0;
+
+// Stack to track break/continue labels for nested loops
+#define MAX_LOOP_DEPTH 32
+static struct {
+    char *break_label;
+    char *continue_label;
+} loop_stack[MAX_LOOP_DEPTH];
+static int loop_depth = 0;
+
+// Helper to generate unique labels
+static char* gen_label() {
+    static char buf[32];
+    snprintf(buf, sizeof(buf), "L%d", label_counter++);
+    return strdup(buf);
+}
+
+static void push_loop(char *break_label, char *continue_label) {
+    if (loop_depth < MAX_LOOP_DEPTH) {
+        loop_stack[loop_depth].break_label = break_label;
+        loop_stack[loop_depth].continue_label = continue_label;
+        loop_depth++;
+    }
+}
+
+static void pop_loop() {
+    if (loop_depth > 0) {
+        loop_depth--;
+    }
+}
+
+static char* get_break_label() {
+    return (loop_depth > 0) ? loop_stack[loop_depth - 1].break_label : NULL;
+}
+
+static char* get_continue_label() {
+    return (loop_depth > 0) ? loop_stack[loop_depth - 1].continue_label : NULL;
+}
+
 void irlist_init(IRList *l) {
     l->head = NULL;
     l->tail = NULL;
@@ -218,12 +257,12 @@ void ir_print(IRList *ir, FILE *out) {
 }
 
 static void gen_expr(AST *n, IRList *out);
+static void gen_stmt(AST *n, IRList *out);
 
 static void gen_binop(AST *n, IRList *out) {
     gen_expr(n->binop.left, out);
     gen_expr(n->binop.right, out);
     
-    // Pass result type with the operation
     Symbol *type_sym = create_type_symbol(n->type);
     
     switch(n->binop.op) {
@@ -260,12 +299,10 @@ static void gen_unary(AST *n, IRList *out) {
             ir_emit(out, IR_BIT_NOT, NULL, 0);
             break;
         case UOP_LOGICAL_NOT:
-            // !x is equivalent to x == 0
             ir_emit(out, IR_PUSH_INT, NULL, 0);
             ir_emit(out, IR_EQ, NULL, 0);
             break;
         case UOP_CAST:
-            // Handle type casts
             if (n->unary.cast_type && n->unary.operand->type) {
                 Type *from = n->unary.operand->type;
                 Type *to = n->unary.cast_type;
@@ -279,7 +316,6 @@ static void gen_unary(AST *n, IRList *out) {
             break;
         case UOP_PRE_INC:
         case UOP_POST_INC:
-            // For x++: load x, dup if post-inc, push 1, add, store
             if (n->unary.operand->kind == AST_ID) {
                 Symbol *sym = n->unary.operand->symbol;
                 if (n->unary.op == UOP_POST_INC) {
@@ -334,7 +370,6 @@ static void gen_unary(AST *n, IRList *out) {
 }
 
 static void gen_assign(AST *n, IRList *out, bool need_value) {
-    // Handle compound assignment operators
     if (n->assign.op != AOP_ASSIGN) {
         if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
             Symbol *array_sym = n->assign.lhs->array.array->symbol;
@@ -405,7 +440,6 @@ static void gen_assign(AST *n, IRList *out, bool need_value) {
             }
         }
     } else {
-        // Simple assignment
         if (n->assign.lhs->kind == AST_ARRAY_ACCESS) {
             gen_expr(n->assign.lhs->array.array, out);
             gen_expr(n->assign.lhs->array.index, out);
@@ -453,6 +487,62 @@ static void gen_call(AST *n, IRList *out) {
     if (func_name) {
         ir_emit_with_symbol(out, IR_CALL, func_name, n->call.arg_count, func_symbol);
     }
+}
+
+static void gen_logical_or(AST *n, IRList *out) {
+    char *end_label = gen_label();
+    
+    gen_expr(n->logical.left, out);
+    ir_emit(out, IR_DUP, NULL, 0);
+    
+    // If left is non-zero, result is true - skip right operand
+    ir_emit(out, IR_JUMP_IF_ZERO, end_label, 0);
+    ir_emit(out, IR_POP, NULL, 0);
+    ir_emit(out, IR_PUSH_INT, NULL, 1);
+    char *skip = gen_label();
+    ir_emit(out, IR_JUMP, skip, 0);
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
+    ir_emit(out, IR_POP, NULL, 0);
+    gen_expr(n->logical.right, out);
+    
+    ir_emit(out, IR_LABEL, skip, 0);
+}
+
+static void gen_logical_and(AST *n, IRList *out) {
+    char *end_label = gen_label();
+    
+    gen_expr(n->logical.left, out);
+    ir_emit(out, IR_DUP, NULL, 0);
+    
+    // If left is zero, result is false - skip right operand
+    ir_emit(out, IR_JUMP_IF_ZERO, end_label, 0);
+    ir_emit(out, IR_POP, NULL, 0);
+    gen_expr(n->logical.right, out);
+    char *skip = gen_label();
+    ir_emit(out, IR_JUMP, skip, 0);
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
+    ir_emit(out, IR_POP, NULL, 0);
+    ir_emit(out, IR_PUSH_INT, NULL, 0);
+    
+    ir_emit(out, IR_LABEL, skip, 0);
+}
+
+static void gen_ternary(AST *n, IRList *out) {
+    char *false_label = gen_label();
+    char *end_label = gen_label();
+    
+    gen_expr(n->ternary.cond, out);
+    ir_emit(out, IR_JUMP_IF_ZERO, false_label, 0);
+    
+    gen_expr(n->ternary.iftrue, out);
+    ir_emit(out, IR_JUMP, end_label, 0);
+    
+    ir_emit(out, IR_LABEL, false_label, 0);
+    gen_expr(n->ternary.iffalse, out);
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
 }
 
 static void gen_expr(AST *n, IRList *out) {
@@ -516,13 +606,15 @@ static void gen_expr(AST *n, IRList *out) {
             break;
             
         case AST_LOGICAL_OR:
+            gen_logical_or(n, out);
+            break;
+            
         case AST_LOGICAL_AND:
-            gen_expr(n->logical.left, out);
-            gen_expr(n->logical.right, out);
-            if (n->kind == AST_LOGICAL_OR)
-                ir_emit(out, IR_BIT_OR, NULL, 0);
-            else
-                ir_emit(out, IR_BIT_AND, NULL, 0);
+            gen_logical_and(n, out);
+            break;
+            
+        case AST_TERNARY:
+            gen_ternary(n, out);
             break;
             
         default:
@@ -533,11 +625,9 @@ static void gen_expr(AST *n, IRList *out) {
 void gen_decl(AST *n, IRList *out) {
     if (!n || n->kind != AST_DECL) return;
     
-    // If this is an array declaration, allocate it
     if (n->decl.decl_type && n->decl.decl_type->kind == TY_ARRAY) {
         Symbol *sym = n->symbol;
         
-        // For local arrays, we need to allocate and store
         if (sym && sym->is_local) {
             int array_size;
             if(n->decl.decl_type->array_size > 0){
@@ -553,7 +643,6 @@ void gen_decl(AST *n, IRList *out) {
         }
     }
     
-    // If there's an initializer, generate code for it
     if (n->decl.init) {
         gen_expr(n->decl.init, out);
         
@@ -564,6 +653,103 @@ void gen_decl(AST *n, IRList *out) {
             ir_emit_with_symbol(out, IR_STORE_GLOBAL, n->decl.name, 0, sym);
         }
     }
+}
+
+static void gen_if(AST *n, IRList *out) {
+    char *else_label = gen_label();
+    char *end_label = gen_label();
+    
+    gen_expr(n->if_stmt.cond, out);
+    ir_emit(out, IR_JUMP_IF_ZERO, else_label, 0);
+    
+    gen_stmt(n->if_stmt.then_branch, out);
+    ir_emit(out, IR_JUMP, end_label, 0);
+    
+    ir_emit(out, IR_LABEL, else_label, 0);
+    if (n->if_stmt.else_branch) {
+        gen_stmt(n->if_stmt.else_branch, out);
+    }
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
+}
+
+static void gen_while(AST *n, IRList *out) {
+    char *start_label = gen_label();
+    char *end_label = gen_label();
+    
+    push_loop(end_label, start_label);
+    
+    ir_emit(out, IR_LABEL, start_label, 0);
+    gen_expr(n->while_stmt.cond, out);
+    ir_emit(out, IR_JUMP_IF_ZERO, end_label, 0);
+    
+    gen_stmt(n->while_stmt.body, out);
+    ir_emit(out, IR_JUMP, start_label, 0);
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
+    
+    pop_loop();
+}
+
+static void gen_do_while(AST *n, IRList *out) {
+    char *start_label = gen_label();
+    char *cond_label = gen_label();
+    char *end_label = gen_label();
+    
+    push_loop(end_label, cond_label);
+    
+    ir_emit(out, IR_LABEL, start_label, 0);
+    gen_stmt(n->do_while.body, out);
+    
+    ir_emit(out, IR_LABEL, cond_label, 0);
+    gen_expr(n->do_while.cond, out);
+    ir_emit(out, IR_JUMP_IF_ZERO, end_label, 0);
+    ir_emit(out, IR_JUMP, start_label, 0);
+    
+    ir_emit(out, IR_LABEL, end_label, 0);
+    
+    pop_loop();
+}
+
+static void gen_for(AST *n, IRList *out) {
+    char *start_label = gen_label();
+    char *post_label = gen_label();
+    char *end_label = gen_label();
+    
+    // Init
+    if (n->for_stmt.init) {
+        gen_stmt(n->for_stmt.init, out);
+    }
+    
+    push_loop(end_label, post_label);
+    
+    // Condition check
+    ir_emit(out, IR_LABEL, start_label, 0);
+    if (n->for_stmt.cond) {
+        gen_expr(n->for_stmt.cond, out);
+        ir_emit(out, IR_JUMP_IF_ZERO, end_label, 0);
+    }
+    
+    // Body
+    gen_stmt(n->for_stmt.body, out);
+    
+    // Post (continue jumps here)
+    ir_emit(out, IR_LABEL, post_label, 0);
+    if (n->for_stmt.post) {
+        if (n->for_stmt.post->kind == AST_ASSIGN || 
+            n->for_stmt.post->kind == AST_UNARY ||
+            n->for_stmt.post->kind == AST_FUNC_CALL) {
+            gen_stmt(n->for_stmt.post, out);
+        } else {
+            gen_expr(n->for_stmt.post, out);
+            ir_emit(out, IR_POP, NULL, 0);
+        }
+    }
+    
+    ir_emit(out, IR_JUMP, start_label, 0);
+    ir_emit(out, IR_LABEL, end_label, 0);
+    
+    pop_loop();
 }
 
 static void gen_stmt(AST *n, IRList *out) {
@@ -581,6 +767,38 @@ static void gen_stmt(AST *n, IRList *out) {
             } else {
                 ir_emit(out, IR_RETURN_VOID, NULL, 0);
             }
+            break;
+            
+        case AST_BREAK: {
+            char *break_label = get_break_label();
+            if (break_label) {
+                ir_emit(out, IR_JUMP, break_label, 0);
+            }
+            break;
+        }
+            
+        case AST_CONTINUE: {
+            char *continue_label = get_continue_label();
+            if (continue_label) {
+                ir_emit(out, IR_JUMP, continue_label, 0);
+            }
+            break;
+        }
+            
+        case AST_IF:
+            gen_if(n, out);
+            break;
+            
+        case AST_WHILE:
+            gen_while(n, out);
+            break;
+            
+        case AST_DO_WHILE:
+            gen_do_while(n, out);
+            break;
+            
+        case AST_FOR:
+            gen_for(n, out);
             break;
             
         case AST_BLOCK:

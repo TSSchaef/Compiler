@@ -63,6 +63,7 @@ int main(int argc, char *argv[]){
             break;
 
         case 5:
+        case 6:
             if(pushFile(argv[2]) != 0){
                return -1;
             }

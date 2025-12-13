@@ -27,7 +27,6 @@ void codegen_error(const char *msg, AST *node) {
 // Helper function to check if an IR instruction operates on floats
 static bool is_float_operation(IRInstruction *p) {
     if (!p->symbol || !p->symbol->type) {
-        fprintf(stderr, "Warning: IR instruction missing type information\n");
         return false;
     }
     return p->symbol->type->kind == TY_FLT;
@@ -39,7 +38,7 @@ void emit_class_header(FILE *out, const char *classname) {
 }
 
 void emit_global_field(FILE *out, const char *name, Type *type) {
-    const char *type_desc = "I"; // default to int
+    const char *type_desc = "I";
     
     if (type) {
         switch(type->kind) {
@@ -109,7 +108,7 @@ void emit_method_footer(FILE *out) {
 }
 
 static void emit_comparison(FILE *out, IRKind kind) {
-    static int label_counter = 0;
+    static int label_counter = 10000;  // Start high to avoid conflicts with user labels
     int true_label = label_counter++;
     int end_label = label_counter++;
     
@@ -127,9 +126,9 @@ static void emit_comparison(FILE *out, IRKind kind) {
     fprintf(out, "    %s L%d\n", cmp_instr, true_label);
     fprintf(out, "    iconst_0\n");
     fprintf(out, "    goto L%d\n", end_label);
-    fprintf(out, "L%d:\n", true_label);
+    fprintf(out, "\nL%d:\n", true_label);
     fprintf(out, "    iconst_1\n");
-    fprintf(out, "L%d:\n", end_label);
+    fprintf(out, "\nL%d:\n", end_label);
 }
 
 static const char *array_load_opcode(Type *array_type) {
@@ -178,6 +177,21 @@ static const char *newarray_type(Type *elem_type) {
 void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
     for (IRInstruction *p = ir->head; p; p = p->next) {
         switch(p->kind) {
+            case IR_LABEL:
+                // Emit label
+                fprintf(out, "%s:\n", p->s);
+                break;
+                
+            case IR_JUMP:
+                // Unconditional jump
+                fprintf(out, "    goto %s\n", p->s);
+                break;
+                
+            case IR_JUMP_IF_ZERO:
+                // Conditional jump if top of stack is zero
+                fprintf(out, "    ifeq %s\n", p->s);
+                break;
+                
             case IR_PUSH_INT:
                 if (p->i == -1) {
                     fprintf(out, "    iconst_m1\n");
@@ -193,7 +207,6 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 break;
                 
             case IR_PUSH_FLOAT:
-                // Special handling for common float constants
                 if (p->f == 0.0f) {
                     fprintf(out, "    fconst_0\n");
                 } else if (p->f == 1.0f) {
@@ -201,7 +214,6 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 } else if (p->f == 2.0f) {
                     fprintf(out, "    fconst_2\n");
                 } else {
-                    // Use %f format but append 'f' to make it a float literal
                     fprintf(out, "    ldc %ff\n", p->f);
                 }
                 break;
@@ -231,18 +243,34 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                 
             case IR_LOAD_LOCAL: {
                 if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FLT) {
-                    fprintf(out, "    fload_%d\n", p->i);
+                    if (p->i >= 0 && p->i <= 3) {
+                        fprintf(out, "    fload_%d\n", p->i);
+                    } else {
+                        fprintf(out, "    fload %d\n", p->i);
+                    }
                 } else {
-                    fprintf(out, "    iload_%d\n", p->i);
+                    if (p->i >= 0 && p->i <= 3) {
+                        fprintf(out, "    iload_%d\n", p->i);
+                    } else {
+                        fprintf(out, "    iload %d\n", p->i);
+                    }
                 }
                 break;
             }
                 
             case IR_STORE_LOCAL: {
                 if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FLT) {
-                    fprintf(out, "    fstore_%d\n", p->i);
+                    if (p->i >= 0 && p->i <= 3) {
+                        fprintf(out, "    fstore_%d\n", p->i);
+                    } else {
+                        fprintf(out, "    fstore %d\n", p->i);
+                    }
                 } else {
-                    fprintf(out, "    istore_%d\n", p->i);
+                    if (p->i >= 0 && p->i <= 3) {
+                        fprintf(out, "    istore_%d\n", p->i);
+                    } else {
+                        fprintf(out, "    istore %d\n", p->i);
+                    }
                 }
                 break;
             }
