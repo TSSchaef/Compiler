@@ -262,9 +262,10 @@ static void gen_stmt(AST *n, IRList *out);
 static void gen_binop(AST *n, IRList *out) {
     gen_expr(n->binop.left, out);
     gen_expr(n->binop.right, out);
-    
+
+    // Pass result type with the operation
     Symbol *type_sym = create_type_symbol(n->type);
-    
+
     switch(n->binop.op) {
         case OP_ADD: ir_emit_with_symbol(out, IR_ADD, NULL, 0, type_sym); break;
         case OP_SUB: ir_emit_with_symbol(out, IR_SUB, NULL, 0, type_sym); break;
@@ -276,12 +277,13 @@ static void gen_binop(AST *n, IRList *out) {
         case OP_BIT_XOR: ir_emit(out, IR_BIT_XOR, NULL, 0); break;
         case OP_SHL: ir_emit(out, IR_SHL, NULL, 0); break;
         case OP_SHR: ir_emit(out, IR_SHR, NULL, 0); break;
-        case OP_EQ: ir_emit(out, IR_EQ, NULL, 0); break;
-        case OP_NEQ: ir_emit(out, IR_NEQ, NULL, 0); break;
-        case OP_LT: ir_emit(out, IR_LT, NULL, 0); break;
-        case OP_GT: ir_emit(out, IR_GT, NULL, 0); break;
-        case OP_LE: ir_emit(out, IR_LE, NULL, 0); break;
-        case OP_GE: ir_emit(out, IR_GE, NULL, 0); break;
+                     // For comparisons, pass the LEFT operand type (what we're comparing)
+        case OP_EQ: ir_emit_with_symbol(out, IR_EQ, NULL, 0, create_type_symbol(n->binop.left->type)); break;
+        case OP_NEQ: ir_emit_with_symbol(out, IR_NEQ, NULL, 0, create_type_symbol(n->binop.left->type)); break;
+        case OP_LT: ir_emit_with_symbol(out, IR_LT, NULL, 0, create_type_symbol(n->binop.left->type)); break;
+        case OP_GT: ir_emit_with_symbol(out, IR_GT, NULL, 0, create_type_symbol(n->binop.left->type)); break;
+        case OP_LE: ir_emit_with_symbol(out, IR_LE, NULL, 0, create_type_symbol(n->binop.left->type)); break;
+        case OP_GE: ir_emit_with_symbol(out, IR_GE, NULL, 0, create_type_symbol(n->binop.left->type)); break;
         default: break;
     }
 }

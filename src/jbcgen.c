@@ -107,23 +107,51 @@ void emit_method_footer(FILE *out) {
     fprintf(out, ".end method\n");
 }
 
-static void emit_comparison(FILE *out, IRKind kind) {
-    static int label_counter = 10000;  // Start high to avoid conflicts with user labels
+static void emit_comparison(FILE *out, IRKind kind, IRInstruction *instr) {
+    static int label_counter = 10000;
     int true_label = label_counter++;
     int end_label = label_counter++;
-    
+
+    // Check if comparing floats
+    bool is_float = false;
+    if (instr->symbol && instr->symbol->type && instr->symbol->type->kind == TY_FLT) {
+        is_float = true;
+    }
+
+    if (is_float) {
+        // For float comparison: first use fcmpl to convert to -1, 0, or 1
+        fprintf(out, "    fcmpl\n");
+    }
+
     const char *cmp_instr;
     switch(kind) {
-        case IR_EQ: cmp_instr = "if_icmpeq"; break;
-        case IR_NEQ: cmp_instr = "if_icmpne"; break;
-        case IR_LT: cmp_instr = "if_icmplt"; break;
-        case IR_GT: cmp_instr = "if_icmpgt"; break;
-        case IR_LE: cmp_instr = "if_icmple"; break;
-        case IR_GE: cmp_instr = "if_icmpge"; break;
+        case IR_EQ: cmp_instr = "ifeq"; break;
+        case IR_NEQ: cmp_instr = "ifne"; break;
+        case IR_LT: cmp_instr = "iflt"; break;
+        case IR_GT: cmp_instr = "ifgt"; break;
+        case IR_LE: cmp_instr = "ifle"; break;
+        case IR_GE: cmp_instr = "ifge"; break;
         default: return;
     }
-    
-    fprintf(out, "    %s L%d\n", cmp_instr, true_label);
+
+    if (is_float) {
+        // After fcmpl, we have a single int on stack - use single-operand comparison
+        fprintf(out, "    %s L%d\n", cmp_instr, true_label);
+    } else {
+        // For integers, use two-operand comparison
+        const char *int_cmp;
+        switch(kind) {
+            case IR_EQ: int_cmp = "if_icmpeq"; break;
+            case IR_NEQ: int_cmp = "if_icmpne"; break;
+            case IR_LT: int_cmp = "if_icmplt"; break;
+            case IR_GT: int_cmp = "if_icmpgt"; break;
+            case IR_LE: int_cmp = "if_icmple"; break;
+            case IR_GE: int_cmp = "if_icmpge"; break;
+            default: return;
+        }
+        fprintf(out, "    %s L%d\n", int_cmp, true_label);
+    }
+
     fprintf(out, "    iconst_0\n");
     fprintf(out, "    goto L%d\n", end_label);
     fprintf(out, "\nL%d:\n", true_label);
@@ -351,7 +379,7 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
             case IR_GT:
             case IR_LE:
             case IR_GE:
-                emit_comparison(out, p->kind);
+                emit_comparison(out, p->kind, p);
                 break;
                 
             case IR_CALL:
@@ -373,18 +401,26 @@ void emit_java_from_ir(FILE *out, const char *classname, IRList *ir) {
                     }
                 } else {
                     const char *return_desc = "I";
-                    
+
                     if (p->symbol && p->symbol->type && p->symbol->type->kind == TY_FUNC) {
                         return_desc = get_type_descriptor(p->symbol->type->return_type);
+
+                        fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
+                        // Use actual parameter types from function signature
+                        for (int i = 0; i < p->symbol->type->param_count; i++) {
+                            fprintf(out, "%s", get_type_descriptor(p->symbol->type->params[i]));
+                        }
+                        fprintf(out, ")%s\n", return_desc);
+                    } else {
+                        // Fallback if no symbol info
+                        fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
+                        for (int i = 0; i < p->i; i++) {
+                            fprintf(out, "I");
+                        }
+                        fprintf(out, ")%s\n", return_desc);
                     }
-                    
-                    fprintf(out, "    invokestatic Method %s %s (", classname, p->s);
-                    for (int i = 0; i < p->i; i++) {
-                        fprintf(out, "I");
-                    }
-                    fprintf(out, ")%s\n", return_desc);
                 }
-                break;  
+                break;
 
             case IR_RETURN:
                 fprintf(out, "    ireturn\n");
