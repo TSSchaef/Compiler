@@ -32,7 +32,7 @@ To remove all object, binary, and dependency files generated use:
 
 ## Modes
 
-There are 5 modes for the compiler. Mode 1 does NOT require an infile. It will simply print the version information for the compiler.
+There are 5-6 modes for the compiler. Mode 1 does NOT require an infile. It will simply print the version information for the compiler.
 
 Mode 2 requires an infile and will perform lexical analysis on it, outputting the token stream to a .lexer file. Supported features for the lexer include:
 
@@ -90,7 +90,7 @@ Mode 4 requires an infile and will perform lexical analysis, parsing, and type c
  * Struct member selection 
  * const with struct 
 
-Mode 5 requires an infile and will perform a full compilation on it (lexical analysis, parsing, type checking, and code generation). It will output the generated java bytecode in a plaintext file with the .j extension. This can assembled to binary with a Java assembler like Krakatau. Supported features for the code genderation include:
+Modes 5 and 6 are functionally the same, they were used for separate development cycles of the code generation. These modes require an infile and will perform a full compilation on it (lexical analysis, parsing, type checking, and code generation). It will output the generated java bytecode in a plaintext file with the .j extension. This can assembled to binary with a Java assembler like Krakatau. Supported features for the code genderation include:
 
  * class and .super lines
  * Special method \<init\>
@@ -106,3 +106,4 @@ Mode 5 requires an infile and will perform a full compilation on it (lexical ana
  * Arrays
  * Special method <clinit>
  * Smart stack management
+ * Control flow sequences (if/else/while/etc.)
